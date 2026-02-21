@@ -238,6 +238,59 @@ def compute_A_f(F_coeffs, p):
 '''
 Goal #2 is to just compute with the extra O(g) factor
 '''
+
+
+def compute_A_f_fast(F_coeffs, p):
+    
+    d = len(F_coeffs)-1
+    g = (d-1) // 2
+    m = (p-1) // 2
+    R.<k> = PolynomialRing(Zmod(p^mu))
+    k = R.gen()
+    F_coeffs = [R(c) for c in F_coeffs]
+    F0 = R(F_coeffs[0])
+
+    acc = Matrix(R, 1, d)
+    A_f = []
+
+    F0_p = F_coeffs[0]^(p-1)
+
+    s = p-1
+    t = floor(sqrt(s))
+    t_prime = s - t^2
+
+    # the following are reusable objects for the sprint matrix products and 
+    # for the constant products
+    reusable_T = compute_reusable_T_product(p, t, F_coeffs, m, d, R)
+    reusable_int = compute_reusable_int(p, s, t, t_prime, R)
+    
+    for i in range(0, g):
+        # the following step is to compute the single step 
+        # U_(ip) = U_(ip-1)*T_(ip)*(constants)
+
+        if i == 0:
+            acc[0, -1] = R(F0^m)
+            # print(acc)
+        else:
+            T_single = generate_T_matrix(p, p*i, d, m, F_coeffs)
+            acc = acc * T_single
+            to_invert = i*p*F0
+            acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
+            # print(acc)
+
+        # the following step is to compute the sprint step 
+        # U_((i+1)*p) = U_(ip)*T_(ip+1)*T_(ip+2)*...*T_(ip+p-1) * constants
+        acc = acc * compute_T_product(p, i*p, s, t, t_prime, F_coeffs, m, d, R, reusable_T)
+        to_invert = (Zmod(p^mu)(compute_int_products(p, i*p, s, t, t_prime, R, reusable_int)*F0_p))
+        acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
+        
+        A_f.append(list(acc[0][(-g):]))
+
+
+    print("computed A_f")
+    A_mod = Matrix(A_f).apply_map(lambda x: Integer(x) % p)
+    print(A_mod)
+    return A_f
     
 
 p = 59629079
