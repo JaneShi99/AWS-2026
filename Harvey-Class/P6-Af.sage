@@ -34,8 +34,6 @@ def print_tree(root):
 Given a list of objects, build the product tree. 
 The product is not type dependent.
 '''
-
-
 def build_product_tree(lin_list):
     if not lin_list: return None
     
@@ -52,11 +50,18 @@ def build_product_tree(lin_list):
     
     return recursive_helper(0, len(lin_list))
 
+
+'''
+Given a list of objects, compute the product of the objects.
+'''
 def fast_product(lin_list):
     product_tree = build_product_tree(lin_list)
     return product_tree.val
 
-
+'''
+Given a polynomial (as the root), and a product tree coming from a list of linear polynomials,
+compute the modular evaluation top-down.
+'''
 def remainder_tree(root_element, prod_tree_root):
     leaf_val_list = []
     def recursive_helper(element, prod_tree): 
@@ -71,6 +76,10 @@ def remainder_tree(root_element, prod_tree_root):
     rem_tree = recursive_helper(root_element, prod_tree_root)
     return rem_tree, leaf_val_list
 
+'''
+Given a list of values, and a polynomial, using the remainder tree, 
+compute the polynomial evaluated at each of the values.
+'''
 def evaluation_tree(evaluation_poly, values, p):
     R.<k> = PolynomialRing(Zmod(p^mu))
     k = R.gen()
@@ -79,6 +88,9 @@ def evaluation_tree(evaluation_poly, values, p):
     rem_tree, leaf_val_list = remainder_tree(evaluation_poly, prod_tree)
     return leaf_val_list
 
+'''
+Compute the single matrix T_k
+'''
 def generate_T_matrix(p, k_val, d, m, F_coeffs):
     R.<k> = PolynomialRing(Zmod(p^mu))
     sub = R(k_val) * F_coeffs[0]
@@ -92,77 +104,72 @@ def generate_T_matrix(p, k_val, d, m, F_coeffs):
 
     return M
 
+'''
+Compute the product of matrices T_(k+1)...T_(k+t) as a matrix whose entries are polynomials in k.
+Using fast matrix product.
+'''
 def compute_reusable_T_product(p, t, F_coeffs, m, d, R):
-    # the fast matrix product T_(k+1)...T_(k+t) as a polynomial in k
     k = R.gen()
     T_matrices = [generate_T_matrix(p,k+i,d,m,F_coeffs) for i in range(1,t+1)]
     T_product = fast_product(T_matrices)
 
     return T_product
 
-#compute T_(k0+1)...T_(k0+s)
+'''
+reusable_T is the output of the above function, which is only evaluated once in the algorithm.
+In this function, we compute the product of matrices T_(k0+1)...T_(k0+s)
+by plugging in those values and using the evaluation tree.
+'''
 def compute_T_product(p, k0, s, t, t_prime,F_coeffs, m, d, R, reusable_T):
 
     k = R.gen()
 
-    # reusable_T is the fast matrix product T_(k+1)...T_(k+t) as a polynomial in k
-
-    #reusable_T = compute_reusable_T_product(p, t, F_coeffs, m, d, R)
-
     values = [k0 + i*t for i in range(0, t)]
     nrows, ncols = reusable_T.nrows(), reusable_T.ncols()
-    entry_evals = [evaluation_tree(reusable_T[i,j], values, p) for i in range(nrows) for j in range(ncols)]
 
+    #using evaluation tree to compute the matrix product T_(k0+1)...T_(k0+t^2)
+    entry_evals = [evaluation_tree(reusable_T[i,j], values, p) for i in range(nrows) for j in range(ncols)]
     mat_vals = [
         matrix(R.base_ring(), nrows, ncols, [entry[k] for entry in entry_evals]) 
         for k in range(len(values))
     ]
+    total_mat_prod_t_squared = fast_product(mat_vals)
 
+    #compute the product of the "leftover" matrices T_(k0+t^2+1)...T_(k0+s)
     T_matrices_left = [generate_T_matrix(p, idx, d, m, F_coeffs) for idx in range(k0+t^2+1, k0+s+1)]
 
-    total_mat_prod_t_squared = fast_product(mat_vals)
     if T_matrices_left:
         total_mat_prod_leftover = fast_product(T_matrices_left)
         total_mat_prod = total_mat_prod_t_squared * total_mat_prod_leftover
     else:
         total_mat_prod = total_mat_prod_t_squared
 
-
-    # naive_prod = product([generate_T_matrix(p,i,d,m,F_coeffs) for i in range(k0+1,k0+s+1)])
-
-
-    # print("total mat prod")
-    # print(total_mat_prod)
-    # print("naive prod")
-    # print(product([generate_T_matrix(p,i,d,m,F_coeffs) for i in range(k0+1,k0+s+1)]))
-
-    # assert total_mat_prod == naive_prod
     return total_mat_prod
  
-# product of (k0+1, k0+2, ..., k0+s)
+# product of (k+1, k+2, ... k+t) as a polynomial in k
 def compute_reusable_int(p, s, t, t_prime, R):
     k = R.gen()
     val_polys = [R(k + j) for j in range(1,t+1)]
     val_prod = fast_product(val_polys)
     return val_prod
 
-
-
+# product of (k0+1, k0+2, ... k0+s) as a polynomial in k
 def compute_int_products(p, k0, s, t, t_prime, R, reusable_int):
     t = floor(sqrt(s))
     t_prime = s - t^2
     k = R.gen()
     
+    #compute the product of (k0+1, k0+2, ... k0+t^2) using reusable_int
     values = [R(k0 + j*t) for j in range(0, t)]
     evals = evaluation_tree(reusable_int, values, p)
     
-
+    #compute the product of (k0+t^2+1, k0+t^2+2, ... k0+s)
     values_left = [R(j) for j in range(k0+t^2+1, k0+s+1)]
     final_product = product(evals) * product(values_left)
     
     return final_product
 
-
+# custom division in Z/p^mu Z
 def divide_custom(x, y, p, R):
     divide_p_power = valuation(Integer(y), p)
     x_div_p = R(Integer(x)/(p^divide_p_power))
@@ -179,7 +186,7 @@ def compute_A_f(F_coeffs, p):
     
     d = len(F_coeffs)-1
     g = (d-1) // 2
-    m = (p-1)//2
+    m = (p-1) // 2
     R.<k> = PolynomialRing(Zmod(p^mu))
     k = R.gen()
     F_coeffs = [R(c) for c in F_coeffs]
@@ -194,12 +201,15 @@ def compute_A_f(F_coeffs, p):
     t = floor(sqrt(s))
     t_prime = s - t^2
 
+    # the following are reusable objects for the sprint matrix products and 
+    # for the constant products
     reusable_T = compute_reusable_T_product(p, t, F_coeffs, m, d, R)
     reusable_int = compute_reusable_int(p, s, t, t_prime, R)
     
     for i in range(0, g):
         # the following step is to compute the single step 
-        # U_(ip-1)*T_(ip) = U_(ip)
+        # U_(ip) = U_(ip-1)*T_(ip)*(constants)
+
         if i == 0:
             acc[0, -1] = R(F0^m)
             # print(acc)
@@ -210,10 +220,9 @@ def compute_A_f(F_coeffs, p):
             acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
             # print(acc)
 
+        # the following step is to compute the sprint step 
+        # U_((i+1)*p) = U_(ip)*T_(ip+1)*T_(ip+2)*...*T_(ip+p-1) * constants
         acc = acc * compute_T_product(p, i*p, s, t, t_prime, F_coeffs, m, d, R, reusable_T)
-
-        # p-adic inversion is kind of broken here!
-        
         to_invert = (Zmod(p^mu)(compute_int_products(p, i*p, s, t, t_prime, R, reusable_int)*F0_p))
         acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
         

@@ -4,6 +4,9 @@ import timeit as timeit_module
 
 timer = timeit_module.default_timer
 
+'''
+The following implements ``accumulating remainder tree``
+'''
 def remainder_tree_builder(value_tree, modulus_tree):
     leave_val_list = []
     def recursive_helper(value_subtree, modulus_subtree, higher_value, left_sub, left_nbd_val):
