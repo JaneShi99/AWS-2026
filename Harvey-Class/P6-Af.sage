@@ -269,6 +269,13 @@ def compute_A_f_fast(F_coeffs, p):
     R_1 = R0_minus_Rp.apply_map(lambda x: R(Integer(x)/p))
     sprint_matrices = [R_0 + (i*p)*R_1 for i in range(0, g)]
 
+    int_0 = compute_int_products(p, 0, s, t, t_prime, R, reusable_int)
+    int_p = compute_int_products(p, p, s, t, t_prime, R, reusable_int)
+    int_0_minus_int_p = int_p - int_0
+    int_1 = R(Integer(int_0_minus_int_p)/p)
+
+    int_products = [int_0 + (i*p)*int_1 for i in range(0, g)]
+
     for i in range(0, g):
         # the following step is to compute the single step 
         # U_(ip) = U_(ip-1)*T_(ip)*(constants)
@@ -287,7 +294,7 @@ def compute_A_f_fast(F_coeffs, p):
         # the following step is to compute the sprint step 
         # U_((i+1)*p) = U_(ip)*T_(ip+1)*T_(ip+2)*...*T_(ip+p-1) * constants
         acc = acc * sprint_matrices[i]
-        to_invert = (Zmod(p^mu)(compute_int_products(p, i*p, s, t, t_prime, R, reusable_int)*F0_p))
+        to_invert = int_products[i]
         acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
         
         A_f.append(list(acc[0][(-g):]))
@@ -299,7 +306,7 @@ def compute_A_f_fast(F_coeffs, p):
     return A_f
     
 
-p = 82684607
+p = 65269543
 R.<x> = PolynomialRing(Zmod(p^mu))
 f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
 discriminant(f)
