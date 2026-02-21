@@ -174,7 +174,7 @@ def divide_custom(x, y, p, R):
     divide_p_power = valuation(Integer(y), p)
     x_div_p = R(Integer(x)/(p^divide_p_power))
     y_div_p = R(Integer(y)/(p^divide_p_power))
-    ans = x_div_p*(y_div_p^(-1))
+    ans = R(x_div_p*(y_div_p^(-1)))
     return ans
 
 
@@ -238,8 +238,6 @@ def compute_A_f(F_coeffs, p):
 '''
 Goal #2 is to just compute with the extra O(g) factor
 '''
-
-
 def compute_A_f_fast(F_coeffs, p):
     
     d = len(F_coeffs)-1
@@ -263,7 +261,14 @@ def compute_A_f_fast(F_coeffs, p):
     # for the constant products
     reusable_T = compute_reusable_T_product(p, t, F_coeffs, m, d, R)
     reusable_int = compute_reusable_int(p, s, t, t_prime, R)
-    
+
+    R_0 = compute_T_product(p, 0, s, t, t_prime, F_coeffs, m, d, R, reusable_T)
+    R_p = compute_T_product(p, p, s, t, t_prime, F_coeffs, m, d, R, reusable_T)
+
+    R0_minus_Rp = R_p - R_0
+    R_1 = R0_minus_Rp.apply_map(lambda x: R(Integer(x)/p))
+    sprint_matrices = [R_0 + (i*p)*R_1 for i in range(0, g)]
+
     for i in range(0, g):
         # the following step is to compute the single step 
         # U_(ip) = U_(ip-1)*T_(ip)*(constants)
@@ -275,12 +280,13 @@ def compute_A_f_fast(F_coeffs, p):
             T_single = generate_T_matrix(p, p*i, d, m, F_coeffs)
             acc = acc * T_single
             to_invert = i*p*F0
+            print(to_invert)
             acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
             # print(acc)
 
         # the following step is to compute the sprint step 
         # U_((i+1)*p) = U_(ip)*T_(ip+1)*T_(ip+2)*...*T_(ip+p-1) * constants
-        acc = acc * compute_T_product(p, i*p, s, t, t_prime, F_coeffs, m, d, R, reusable_T)
+        acc = acc * sprint_matrices[i]
         to_invert = (Zmod(p^mu)(compute_int_products(p, i*p, s, t, t_prime, R, reusable_int)*F0_p))
         acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
         
@@ -293,10 +299,11 @@ def compute_A_f_fast(F_coeffs, p):
     return A_f
     
 
-p = 59629079
+p = 82684607
 R.<x> = PolynomialRing(Zmod(p^mu))
 f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
 discriminant(f)
+
 
 start = timer()
 compute_A_f(f.list(), p)
@@ -304,6 +311,13 @@ end = timer()
 time = end - start
 print(time)
 
+mu = 2
+
+start = timer()
+compute_A_f_fast(f.list(), p)
+end = timer()
+time = end - start
+print(time)
 
 
 #TODO: we should use the O(g) optimization
