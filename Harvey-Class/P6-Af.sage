@@ -287,7 +287,7 @@ def compute_A_f_fast(F_coeffs, p):
             T_single = generate_T_matrix(p, p*i, d, m, F_coeffs)
             acc = acc * T_single
             to_invert = i*p*F0
-            print(to_invert)
+            #print(to_invert)
             acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
             # print(acc)
 
@@ -300,31 +300,56 @@ def compute_A_f_fast(F_coeffs, p):
         A_f.append(list(acc[0][(-g):]))
 
 
-    print("computed A_f")
     A_mod = Matrix(A_f).apply_map(lambda x: Integer(x) % p)
-    print(A_mod)
-    return A_f
     
-
-p = 65269543
-R.<x> = PolynomialRing(Zmod(p^mu))
-f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
-discriminant(f)
-
-
-start = timer()
-compute_A_f(f.list(), p)
-end = timer()
-time = end - start
-print(time)
-
-mu = 2
-
-start = timer()
-compute_A_f_fast(f.list(), p)
-end = timer()
-time = end - start
-print(time)
+    return A_mod
+    
+def exp1():
+    p = 4999
+    R.<x> = PolynomialRing(Zmod(p^mu))
+    f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
+    discriminant(f)
 
 
-#TODO: we should use the O(g) optimization
+    start = timer()
+    ans = compute_A_f(f.list(), p)
+    print(ans)
+    end = timer()
+    time = end - start
+    print(time)
+
+    mu = 2
+
+    start = timer()
+    ans2 = compute_A_f_fast(f.list(), p)
+    print(ans2)
+    end = timer()
+    time = end - start
+    print(time)
+
+
+def exp2():
+    N = 50000
+
+    start = timer()
+    for p in range(2, N):
+        if is_prime(p):
+            print(p)
+            mu = 2
+            R.<x> = PolynomialRing(Zmod(p^mu))
+            f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
+            discriminant(f)
+
+            ans = compute_A_f_fast(f.list(), p)
+            print(ans)
+    
+    end = timer()
+    time = end - start
+    print(time)
+
+'''
+AVG poly up to 50,000 took 59 seconds
+Sqrt up to 50,000 took 1943 seconds (30 minutes) 
+'''
+
+exp2()
