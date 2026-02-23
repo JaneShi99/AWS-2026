@@ -269,12 +269,22 @@ def compute_A_f_fast(F_coeffs, p):
     R_1 = R0_minus_Rp.apply_map(lambda x: R(Integer(x)/p))
     sprint_matrices = [R_0 + (i*p)*R_1 for i in range(0, g)]
 
+    print(p)
+    print("sprint")
+    for mat in sprint_matrices:
+        print(mat.apply_map(lambda x: Integer(x) % (p^2)))
+        print("\n")
+
     int_0 = compute_int_products(p, 0, s, t, t_prime, R, reusable_int)
     int_p = compute_int_products(p, p, s, t, t_prime, R, reusable_int)
     int_0_minus_int_p = int_p - int_0
     int_1 = R(Integer(int_0_minus_int_p)/p)
 
     int_products = [int_0 + (i*p)*int_1 for i in range(0, g)]
+
+    print("int")
+    print(int_products)
+
 
     for i in range(0, g):
         # the following step is to compute the single step 
@@ -294,7 +304,7 @@ def compute_A_f_fast(F_coeffs, p):
         # the following step is to compute the sprint step 
         # U_((i+1)*p) = U_(ip)*T_(ip+1)*T_(ip+2)*...*T_(ip+p-1) * constants
         acc = acc * sprint_matrices[i]
-        to_invert = int_products[i]
+        to_invert = int_products[i]*F0^(p-1)
         acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
         
         A_f.append(list(acc[0][(-g):]))
@@ -327,17 +337,24 @@ def exp1():
     time = end - start
     print(time)
 
-
+'''
+[ 8  2  8 91  5]
+[66 94 77 31  6]
+[36 65 56  9 16]
+[16  8 87 67 75]
+[19 56 56 28 78]
+'''
 def exp2():
-    N = 50000
+    N = 102
 
     start = timer()
-    for p in range(2, N):
+    for p in range(3, N):
         if is_prime(p):
             print(p)
             mu = 2
             R.<x> = PolynomialRing(Zmod(p^mu))
-            f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
+            #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
+            f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
             discriminant(f)
 
             ans = compute_A_f_fast(f.list(), p)

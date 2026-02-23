@@ -71,7 +71,7 @@ def compute_A_f_avg_poly(F_coeffs, N):
                 T_bar = leaf_val_list[p-1]
                 T_bar_int = T_bar.realize(p)
                 T_bar_mod_p2 = T_bar_int.apply_map(lambda x: Zmod(p^2)(x))
-                T_mod_p2 = T_bar_mod_p2.apply_map(lambda x: Zmod(p^2)(x*2^(p-1)))
+                T_mod_p2 = T_bar_mod_p2.apply_map(lambda x: Zmod(p^2)(x * inverse_mod(2^(p-1), p^2)))
                 p_to_mat[i][p] = T_mod_p2
     
     #make the acc remainder tree for integers
@@ -100,7 +100,7 @@ def compute_A_f_avg_poly(F_coeffs, N):
     p_to_A_f = {}
 
     for p in range(N+1):
-        if is_prime(p) and p != 2:
+        if is_prime(p) and p > 5:
 
             R = Zmod(p^2)
             m = (p-1)//2
@@ -126,6 +126,14 @@ def compute_A_f_avg_poly(F_coeffs, N):
             int_products = [int_0 + (l*p)*int_1 for l in range(0, g)]
 
             A_f = []
+            print(p)
+            print("sprint")
+
+            for mat in sprint_matrices:
+                print(mat)
+                print("\n")
+            print("int")
+            print(int_products)
 
             for l in range(0, g):
                 # the following step is to compute the single step 
@@ -139,7 +147,7 @@ def compute_A_f_avg_poly(F_coeffs, N):
                     acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, R))
 
                 acc = acc * sprint_matrices[l]
-                to_invert = int_products[l]
+                to_invert = int_products[l]*(F0_p2^(p-1))
                 acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, R))
                 
                 A_f.append(list(acc[0][(-g):]))
@@ -148,7 +156,7 @@ def compute_A_f_avg_poly(F_coeffs, N):
             p_to_A_f[p] = A_f_p
     
     return p_to_A_f
-                
+
 
 
 '''
@@ -158,9 +166,10 @@ Sqrt up to 50,000 took 1943 seconds (30 minutes)
         
     
 start = timer()
-N = 50000
+N = 102
 R.<x> = PolynomialRing(Integers())
-f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
+#f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
+f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
 answer = compute_A_f_avg_poly(f.list(), N)
 for key, value in answer.items():
     print(key)
