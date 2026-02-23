@@ -1,16 +1,16 @@
-load("P7-utils.sage")
+load("/home/janeshi/AWS26/Harvey-Class/P7-prec-3/P7-utils.sage")
 
 
 def construct_T_bar_ijp(i, j, d, F_coeffs):
-    arr = [[ZP2(0, 0) for _ in range(d)] for _ in range(d)]
+    arr = [[ZP3(0, 0, 0) for _ in range(d)] for _ in range(d)]
 
     for k in range(1, d):
-        arr[k][k-1] = ZP2(2*j*F_coeffs[0], 2*i*F_coeffs[0])
+        arr[k][k-1] = ZP3(2*j*F_coeffs[0], 2*i*F_coeffs[0], 0)
     
     for k in range(d):
-        arr[k][d-1] = ZP2((d-k-2*j)*F_coeffs[d-k], (d-k-2*i)*F_coeffs[d-k])
+        arr[k][d-1] = ZP3((d-k-2*j)*F_coeffs[d-k], (d-k-2*i)*F_coeffs[d-k], 0)
 
-    return ZP2Matrix.from_array(ZZ, arr)
+    return ZP3Matrix.from_array(ZZ, arr)
 
 
 '''
@@ -43,13 +43,13 @@ def compute_A_f_avg_poly(F_coeffs, N):
     d = len(F_coeffs) - 1
     g = (d-1) // 2
 
-    p_to_mat = [{}, {}]
+    p_to_mat = [{}, {}, {}]
 
-    p_to_int = [{}, {}]
+    p_to_int = [{}, {}, {}]
 
 
     # make the acc. remainder tree for matrices
-    for i in [0, 1]:
+    for i in [0, 1, 2]:
         value_tree_leaves = []
 
         for j in range(1, N+1):
@@ -59,7 +59,7 @@ def compute_A_f_avg_poly(F_coeffs, N):
         value_tree = build_product_tree(value_tree_leaves)
         modulus_tree = build_product_tree([k^2 if is_prime(k) else 1 for k in range(1, N+1)])
 
-        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZP2Matrix.identity(ZZ, d))
+        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZP3Matrix.identity(ZZ, d))
         
         '''
         for x, y in enumerate(leaf_val_list):
@@ -70,28 +70,28 @@ def compute_A_f_avg_poly(F_coeffs, N):
             if is_prime(p) and p != 2:
                 T_bar = leaf_val_list[p-1]
                 T_bar_int = T_bar.realize(p)
-                T_bar_mod_p2 = T_bar_int.apply_map(lambda x: Zmod(p^2)(x))
-                T_mod_p2 = T_bar_mod_p2.apply_map(lambda x: Zmod(p^2)(x * inverse_mod(2^(p-1), p^2)))
-                p_to_mat[i][p] = T_mod_p2
+                T_bar_mod_p3 = T_bar_int.apply_map(lambda x: Zmod(p^3)(x))
+                T_mod_p3 = T_bar_mod_p3.apply_map(lambda x: Zmod(p^3)(x * inverse_mod(2^(p-1), p^3)))
+                p_to_mat[i][p] = T_mod_p3
     
     #make the acc remainder tree for integers
-    for i in [0, 1]:
+    for i in [0, 1, 2]:
         value_tree_leaves = []
 
         for k in range(1, N+1):
-            int_i_j = ZP2(k, i)
+            int_i_j = ZP3(k, i, 0)
             value_tree_leaves.append(int_i_j)
         
         value_tree = build_product_tree(value_tree_leaves)
-        modulus_tree = build_product_tree([k^2 if is_prime(k) else 1 for k in range(1, N+1)])
+        modulus_tree = build_product_tree([k^3 if is_prime(k) else 1 for k in range(1, N+1)])
 
-        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZP2(1,0))
+        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZP3(1,0,0))
 
         for p in range(N+1):
             if is_prime(p) and p != 2:
                 T_bar = leaf_val_list[p-1]
                 T_bar_int = T_bar.realize(p)
-                p_to_int[i][p] = Zmod(p^2)(T_bar_int)
+                p_to_int[i][p] = Zmod(p^3)(T_bar_int)
     
     
 
@@ -102,11 +102,11 @@ def compute_A_f_avg_poly(F_coeffs, N):
     for p in range(N+1):
         if is_prime(p) and p > 5:
 
-            R = Zmod(p^2)
+            R = Zmod(p^3)
             m = (p-1)//2
 
-            F_coeffs_p2 = [R(c) for c in F_coeffs]
-            F0_p2 = R(F_coeffs_p2[0])
+            F_coeffs_p3 = [R(c) for c in F_coeffs]
+            F0_p3 = R(F_coeffs_p3[0])
 
             acc = Matrix(R, 1, d)
 
@@ -139,15 +139,15 @@ def compute_A_f_avg_poly(F_coeffs, N):
                 # the following step is to compute the single step 
                 # U_(ip) = U_(ip-1)*T_(ip)*(constants)
                 if l == 0:
-                    acc[0, -1] = R(F0_p2^m)
+                    acc[0, -1] = R(F0_p3^m)
                 else:
                     T_single = generate_T_matrix(p, p*l, d, m, F_coeffs, R)
                     acc = acc * T_single
-                    to_invert = l*p*F0_p2 
+                    to_invert = l*p*F0_p3 
                     acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, R))
 
                 acc = acc * sprint_matrices[l]
-                to_invert = int_products[l]*(F0_p2^(p-1))
+                to_invert = int_products[l]*(F0_p3^(p-1))
                 acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, R))
                 
                 A_f.append(list(acc[0][(-g):]))
@@ -166,7 +166,8 @@ Sqrt up to 50,000 took 1943 seconds (30 minutes)
         
     
 start = timer()
-N = 102
+#N = 102
+N = 9420
 R.<x> = PolynomialRing(Integers())
 #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
 f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)

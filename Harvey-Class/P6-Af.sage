@@ -2,7 +2,8 @@ import timeit as timeit_module
 timer = timeit_module.default_timer
 
 mu = 3
-
+# really seem like we want mu = 3. mu=2 doesn't seem to match for say 101.
+# ?? TODO: maybe ask David about this.
 class TreeNode:
     def __init__(self, val=0, left=None, right=None):
         self.val = val
@@ -348,7 +349,7 @@ def exp2():
     N = 102
 
     start = timer()
-    for p in range(3, N):
+    for p in range(5, N):
         if is_prime(p):
             print(p)
             mu = 2
