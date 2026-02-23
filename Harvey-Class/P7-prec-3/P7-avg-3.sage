@@ -126,14 +126,6 @@ def compute_A_f_avg_poly(F_coeffs, N):
             int_products = [int_0 + (l*p)*int_1 for l in range(0, g)]
 
             A_f = []
-            print(p)
-            print("sprint")
-
-            for mat in sprint_matrices:
-                print(mat)
-                print("\n")
-            print("int")
-            print(int_products)
 
             for l in range(0, g):
                 # the following step is to compute the single step 
