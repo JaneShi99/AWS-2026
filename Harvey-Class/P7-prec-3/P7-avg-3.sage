@@ -43,13 +43,13 @@ def compute_A_f_avg_poly(F_coeffs, N):
     d = len(F_coeffs) - 1
     g = (d-1) // 2
 
-    p_to_mat = [{}, {}, {}]
+    p_to_mat = [{}, {}]
 
-    p_to_int = [{}, {}, {}]
+    p_to_int = [{}, {}]
 
 
     # make the acc. remainder tree for matrices
-    for i in [0, 1, 2]:
+    for i in [0, 1]:
         value_tree_leaves = []
 
         for j in range(1, N+1):
@@ -75,7 +75,7 @@ def compute_A_f_avg_poly(F_coeffs, N):
                 p_to_mat[i][p] = T_mod_p3
     
     #make the acc remainder tree for integers
-    for i in [0, 1, 2]:
+    for i in [0, 1]:
         value_tree_leaves = []
 
         for k in range(1, N+1):
@@ -167,7 +167,7 @@ Sqrt up to 50,000 took 1943 seconds (30 minutes)
     
 start = timer()
 #N = 102
-N = 9420
+N = 6300
 R.<x> = PolynomialRing(Integers())
 #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
 f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
