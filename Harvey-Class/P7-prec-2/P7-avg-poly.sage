@@ -142,9 +142,12 @@ def compute_A_f_avg_poly(F_coeffs, N):
                     acc[0, -1] = R(F0_p2^m)
                 else:
                     T_single = generate_T_matrix(p, p*l, d, m, F_coeffs, R)
-                    acc = acc * T_single
+
+                    Hk = acc * T_single[:,-1]
                     to_invert = l*p*F0_p2 
-                    acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, R))
+                    Hk = Hk.apply_map(lambda x: divide_custom(x, to_invert, p, R))
+                    acc_new = [acc[0][i] for i in range(1, len(acc[0]))] + [Hk[0][0]]
+                    acc = Matrix(R, 1, d, acc_new)
 
                 acc = acc * sprint_matrices[l]
                 to_invert = int_products[l]*(F0_p2^(p-1))

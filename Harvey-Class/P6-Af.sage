@@ -1,7 +1,7 @@
 import timeit as timeit_module 
 timer = timeit_module.default_timer
 
-mu = 3
+mu = 2
 # really seem like we want mu = 3. mu=2 doesn't seem to match for say 101.
 # ?? TODO: maybe ask David about this.
 class TreeNode:
@@ -216,9 +216,12 @@ def compute_A_f(F_coeffs, p):
             # print(acc)
         else:
             T_single = generate_T_matrix(p, p*i, d, m, F_coeffs)
+            
             acc = acc * T_single
             to_invert = i*p*F0
             acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
+            
+            
             # print(acc)
 
         # the following step is to compute the sprint step 
@@ -296,11 +299,17 @@ def compute_A_f_fast(F_coeffs, p):
             # print(acc)
         else:
             T_single = generate_T_matrix(p, p*i, d, m, F_coeffs)
-            acc = acc * T_single
+            
+            Hk = acc * T_single[:, -1]
             to_invert = i*p*F0
-            #print(to_invert)
-            acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
-            # print(acc)
+            Hk = Hk.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
+            acc_new = [acc[0][i] for i in range(1, len(acc[0]))] + [Hk[0][0]]
+            acc = Matrix(R, 1, d, acc_new)
+            #print(acc[1:])
+            #print(Hk)
+            #acc = acc[1:] + Hk
+
+
 
         # the following step is to compute the sprint step 
         # U_((i+1)*p) = U_(ip)*T_(ip+1)*T_(ip+2)*...*T_(ip+p-1) * constants
