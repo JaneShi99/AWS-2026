@@ -152,7 +152,7 @@ def compute_A_f_avg_poly(F_coeffs, N):
                 
                 A_f.append(list(acc[0][(-g):]))
 
-            A_f_p = Matrix(A_f).apply_map(lambda x: Integer(x) % p)
+            A_f_p = Matrix(A_f).apply_map(lambda x: Integer(x) % (p))
             p_to_A_f[p] = A_f_p
     
     return p_to_A_f
@@ -166,7 +166,7 @@ Sqrt up to 50,000 took 1943 seconds (30 minutes)
         
     
 start = timer()
-N = 102
+N = 6300
 R.<x> = PolynomialRing(Integers())
 #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
 f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)

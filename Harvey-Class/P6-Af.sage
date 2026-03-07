@@ -283,8 +283,8 @@ def compute_A_f_fast(F_coeffs, p):
 
     int_products = [int_0 + (i*p)*int_1 for i in range(0, g)]
 
-    print("int")
-    print(int_products)
+    #print("int")
+    #print(int_products)
 
 
     for i in range(0, g):
@@ -311,7 +311,7 @@ def compute_A_f_fast(F_coeffs, p):
         A_f.append(list(acc[0][(-g):]))
 
 
-    A_mod = Matrix(A_f).apply_map(lambda x: Integer(x) % p)
+    A_mod = Matrix(A_f).apply_map(lambda x: Integer(x) % (p))
     
     return A_mod
     
@@ -370,4 +370,31 @@ AVG poly up to 50,000 took 59 seconds
 Sqrt up to 50,000 took 1943 seconds (30 minutes) 
 '''
 
-exp2()
+# exp2()
+
+
+
+def exp3():
+    N = 6299
+    start = timer()
+    for p in [6299]:
+        if is_prime(p):
+            print(p)
+            R.<x> = PolynomialRing(Zmod(p^mu))
+            #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
+            f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
+            discriminant(f)
+
+            ans = compute_A_f_fast(f.list(), p)
+            print(ans)
+    
+    end = timer()
+    time = end - start
+    print(time)
+
+'''
+AVG poly up to 50,000 took 59 seconds
+Sqrt up to 50,000 took 1943 seconds (30 minutes) 
+'''
+
+exp3()
