@@ -152,7 +152,9 @@ def compute_A_f_avg_poly(F_coeffs, d, N):
                 to_invert = int_products[l]*(F0_p2^(p-1))
                 acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, R))
                 
-                A_f.append(list(acc[0][(-g):]))
+                # reversed: acc entries are ordered right-to-left in Harvey's
+                # column convention, so the last entry corresponds to column 0
+                A_f.append(list(reversed(acc[0][(-g):])))
 
             A_f_p = Matrix(A_f).apply_map(lambda x: Integer(x) % (p))
             p_to_A_f[p] = A_f_p
