@@ -38,9 +38,9 @@ def divide_custom(x, y, p, R):
     return ans
 
 
-def compute_A_f_avg_poly(F_coeffs, N):
-
-    d = len(F_coeffs) - 1
+def compute_A_f_avg_poly(C, N):
+    F_coeffs, _ = C.hyperelliptic_polynomials()
+    d = C.degree()
     g = (d-1) // 2
 
     p_to_mat = [{}, {}]
@@ -167,7 +167,8 @@ N = 6300
 R.<x> = PolynomialRing(Integers())
 #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
 f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
-answer = compute_A_f_avg_poly(f.list(), N)
+C = HyperellipticCurve(f)
+answer = compute_A_f_avg_poly(C, N)
 for key, value in answer.items():
     print(key)
     print(value)
