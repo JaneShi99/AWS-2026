@@ -22,6 +22,11 @@ class TestAvgPolyRandomP17To50(unittest.TestCase):
                 p = case.curve.base_ring().characteristic()
                 result = compute_A_f_avg_poly_from_curve(case.curve, p)
 
+                # p may be a bad prime (e.g. p divides f(0)), in which case
+                # the algorithm skips it and result[p] won't exist
+                if p not in result:
+                    self.skipTest(f"p={p} is a bad prime for this curve")
+
                 A_f = result[p]
                 g = A_f.nrows()
 
