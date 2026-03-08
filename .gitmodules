@@ -1,0 +1,3 @@
+[submodule "tests/hyperell_suite"]
+	path = tests/hyperell_suite
+	url = https://github.com/jjgarzella/hyperell_suite.git
