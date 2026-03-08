@@ -2,8 +2,7 @@ import timeit as timeit_module
 timer = timeit_module.default_timer
 
 mu = 2
-# really seem like we want mu = 3. mu=2 doesn't seem to match for say 101.
-# ?? TODO: maybe ask David about this.
+
 class TreeNode:
     def __init__(self, val=0, left=None, right=None):
         self.val = val
@@ -15,7 +14,6 @@ class TreeNode:
 '''
 Attempts to print a tree, but is terrible
 '''
-
 def print_tree(root):
     if root is None: 
         return 
@@ -90,7 +88,7 @@ def evaluation_tree(evaluation_poly, values, p):
     return leaf_val_list
 
 '''
-Compute the single matrix T_k
+Compute the single matrix T_k (See 6.2.2. in Section 6.2. solving recurrences in sqrt time)
 '''
 def generate_T_matrix(p, k_val, d, m, F_coeffs):
     R.<k> = PolynomialRing(Zmod(p^mu))
@@ -107,7 +105,7 @@ def generate_T_matrix(p, k_val, d, m, F_coeffs):
 
 '''
 Compute the product of matrices T_(k+1)...T_(k+t) as a matrix whose entries are polynomials in k.
-Using fast matrix product.
+Using fast matrix product. Corresponds to problem 6.2.4. Part a)
 '''
 def compute_reusable_T_product(p, t, F_coeffs, m, d, R):
     k = R.gen()
@@ -120,9 +118,10 @@ def compute_reusable_T_product(p, t, F_coeffs, m, d, R):
 reusable_T is the output of the above function, which is only evaluated once in the algorithm.
 In this function, we compute the product of matrices T_(k0+1)...T_(k0+s)
 by plugging in those values and using the evaluation tree.
+
+This implements the algorithm in proposition 6.2.3.
 '''
 def compute_T_product(p, k0, s, t, t_prime,F_coeffs, m, d, R, reusable_T):
-
     k = R.gen()
 
     values = [k0 + i*t for i in range(0, t)]
@@ -139,6 +138,7 @@ def compute_T_product(p, k0, s, t, t_prime,F_coeffs, m, d, R, reusable_T):
     #compute the product of the "leftover" matrices T_(k0+t^2+1)...T_(k0+s)
     T_matrices_left = [generate_T_matrix(p, idx, d, m, F_coeffs) for idx in range(k0+t^2+1, k0+s+1)]
 
+    #combine all the products
     if T_matrices_left:
         total_mat_prod_leftover = fast_product(T_matrices_left)
         total_mat_prod = total_mat_prod_t_squared * total_mat_prod_leftover
@@ -178,69 +178,8 @@ def divide_custom(x, y, p, R):
     ans = R(x_div_p*(y_div_p^(-1)))
     return ans
 
-
 '''
-Goal #1 is to just compute as is without reducing the extra O(g) factor
-'''
-    
-def compute_A_f(F_coeffs, p):
-    
-    d = len(F_coeffs)-1
-    g = (d-1) // 2
-    m = (p-1) // 2
-    R.<k> = PolynomialRing(Zmod(p^mu))
-    k = R.gen()
-    F_coeffs = [R(c) for c in F_coeffs]
-    F0 = R(F_coeffs[0])
-
-    acc = Matrix(R, 1, d)
-    A_f = []
-
-    F0_p = F_coeffs[0]^(p-1)
-
-    s = p-1
-    t = floor(sqrt(s))
-    t_prime = s - t^2
-
-    # the following are reusable objects for the sprint matrix products and 
-    # for the constant products
-    reusable_T = compute_reusable_T_product(p, t, F_coeffs, m, d, R)
-    reusable_int = compute_reusable_int(p, s, t, t_prime, R)
-    
-    for i in range(0, g):
-        # the following step is to compute the single step 
-        # U_(ip) = U_(ip-1)*T_(ip)*(constants)
-
-        if i == 0:
-            acc[0, -1] = R(F0^m)
-            # print(acc)
-        else:
-            T_single = generate_T_matrix(p, p*i, d, m, F_coeffs)
-            
-            acc = acc * T_single
-            to_invert = i*p*F0
-            acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
-            
-            
-            # print(acc)
-
-        # the following step is to compute the sprint step 
-        # U_((i+1)*p) = U_(ip)*T_(ip+1)*T_(ip+2)*...*T_(ip+p-1) * constants
-        acc = acc * compute_T_product(p, i*p, s, t, t_prime, F_coeffs, m, d, R, reusable_T)
-        to_invert = (Zmod(p^mu)(compute_int_products(p, i*p, s, t, t_prime, R, reusable_int)*F0_p))
-        acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
-        
-        A_f.append(list(acc[0][(-g):]))
-
-
-    print("computed A_f")
-    A_mod = Matrix(A_f).apply_map(lambda x: Integer(x) % p)
-    print(A_mod)
-    return A_f
-
-
-'''
-Goal #2 is to just compute with the extra O(g) factor
+Goal #2 is to just compute with the extra O(g) factor, which is 6.3.7
 '''
 def compute_A_f_fast(F_coeffs, p):
     
@@ -266,6 +205,7 @@ def compute_A_f_fast(F_coeffs, p):
     reusable_T = compute_reusable_T_product(p, t, F_coeffs, m, d, R)
     reusable_int = compute_reusable_int(p, s, t, t_prime, R)
 
+    # following are objects in problem 6.3.7
     R_0 = compute_T_product(p, 0, s, t, t_prime, F_coeffs, m, d, R, reusable_T)
     R_p = compute_T_product(p, p, s, t, t_prime, F_coeffs, m, d, R, reusable_T)
 
@@ -273,11 +213,13 @@ def compute_A_f_fast(F_coeffs, p):
     R_1 = R0_minus_Rp.apply_map(lambda x: R(Integer(x)/p))
     sprint_matrices = [R_0 + (i*p)*R_1 for i in range(0, g)]
 
+    '''
     print(p)
     print("sprint")
     for mat in sprint_matrices:
         print(mat.apply_map(lambda x: Integer(x) % (p^2)))
         print("\n")
+    '''
 
     int_0 = compute_int_products(p, 0, s, t, t_prime, R, reusable_int)
     int_p = compute_int_products(p, p, s, t, t_prime, R, reusable_int)
@@ -286,17 +228,12 @@ def compute_A_f_fast(F_coeffs, p):
 
     int_products = [int_0 + (i*p)*int_1 for i in range(0, g)]
 
-    #print("int")
-    #print(int_products)
-
-
     for i in range(0, g):
         # the following step is to compute the single step 
         # U_(ip) = U_(ip-1)*T_(ip)*(constants)
 
         if i == 0:
             acc[0, -1] = R(F0^m)
-            # print(acc)
         else:
             T_single = generate_T_matrix(p, p*i, d, m, F_coeffs)
             
@@ -305,11 +242,6 @@ def compute_A_f_fast(F_coeffs, p):
             Hk = Hk.apply_map(lambda x: divide_custom(x, to_invert, p, Zmod(p^mu)))
             acc_new = [acc[0][i] for i in range(1, len(acc[0]))] + [Hk[0][0]]
             acc = Matrix(R, 1, d, acc_new)
-            #print(acc[1:])
-            #print(Hk)
-            #acc = acc[1:] + Hk
-
-
 
         # the following step is to compute the sprint step 
         # U_((i+1)*p) = U_(ip)*T_(ip+1)*T_(ip+2)*...*T_(ip+p-1) * constants
@@ -324,68 +256,15 @@ def compute_A_f_fast(F_coeffs, p):
     
     return A_mod
     
-def exp1():
-    p = 4999
-    R.<x> = PolynomialRing(Zmod(p^mu))
-    f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
-    discriminant(f)
-
-
-    start = timer()
-    ans = compute_A_f(f.list(), p)
-    print(ans)
-    end = timer()
-    time = end - start
-    print(time)
-
-    mu = 2
-
-    start = timer()
-    ans2 = compute_A_f_fast(f.list(), p)
-    print(ans2)
-    end = timer()
-    time = end - start
-    print(time)
-
-'''
-[ 8  2  8 91  5]
-[66 94 77 31  6]
-[36 65 56  9 16]
-[16  8 87 67 75]
-[19 56 56 28 78]
-'''
-def exp2():
-    N = 102
-
-    start = timer()
-    for p in range(5, N):
-        if is_prime(p):
-            print(p)
-            mu = 2
-            R.<x> = PolynomialRing(Zmod(p^mu))
-            #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
-            f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
-            discriminant(f)
-
-            ans = compute_A_f_fast(f.list(), p)
-            print(ans)
-    
-    end = timer()
-    time = end - start
-    print(time)
-
 '''
 AVG poly up to 50,000 took 59 seconds
 Sqrt up to 50,000 took 1943 seconds (30 minutes) 
 '''
 
-# exp2()
-
-
 
 def exp3():
     start = timer()
-    for p in [6073]:
+    for p in [6299]:
         if is_prime(p):
             print(p)
             R.<x> = PolynomialRing(Zmod(p^mu))
