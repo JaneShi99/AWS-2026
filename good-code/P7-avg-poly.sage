@@ -1,4 +1,8 @@
-load("./P7-utils.sage")
+import os as _os
+if _os.path.exists("P7-utils.sage"):
+    load(_os.path.abspath("P7-utils.sage"))
+else:
+    load(_os.path.abspath("good-code/P7-utils.sage"))
 
 # Constructing the matrix on page 39 of notes (Section 7.3)
 def construct_T_bar_ijp(i, j, d, F_coeffs):
@@ -162,17 +166,18 @@ Sqrt up to 50,000 took 1943 seconds (30 minutes)
 '''
         
     
-start = timer()
-N = 6300
-R.<x> = PolynomialRing(Integers())
-#f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
-f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
-C = HyperellipticCurve(f)
-answer = compute_A_f_avg_poly(C, N)
-for key, value in answer.items():
-    print(key)
-    print(value)
+import os as _os
+if 'P7-avg-poly' in _os.path.basename(sys.argv[0]):
+    start = timer()
+    N = 6300
+    R.<x> = PolynomialRing(Integers())
+    #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
+    f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
+    C = HyperellipticCurve(f)
+    answer = compute_A_f_avg_poly(C, N)
+    for key, value in answer.items():
+        print(key)
+        print(value)
 
-
-time = timer() - start
-print(time)
+    time = timer() - start
+    print(time)
