@@ -42,9 +42,7 @@ def divide_custom(x, y, p, R):
     return ans
 
 
-def compute_A_f_avg_poly(C, N):
-    F_coeffs, _ = C.hyperelliptic_polynomials()
-    d = C.degree()
+def compute_A_f_avg_poly(F_coeffs, d, N):
     g = (d-1) // 2
 
     p_to_mat = [{}, {}]
@@ -159,6 +157,12 @@ def compute_A_f_avg_poly(C, N):
     return p_to_A_f
 
 
+def compute_A_f_avg_poly_from_curve(C, N):
+    F_coeffs_poly, _ = C.hyperelliptic_polynomials()
+    d = C.degree()
+    F_coeffs = [Integer(c.lift()) for c in F_coeffs_poly]
+    return compute_A_f_avg_poly(F_coeffs, d, N)
+
 
 '''
 AVG poly up to 50,000 took 59 seconds
@@ -174,7 +178,7 @@ if 'P7-avg-poly' in _os.path.basename(sys.argv[0]):
     #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
     f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
     C = HyperellipticCurve(f)
-    answer = compute_A_f_avg_poly(C, N)
+    answer = compute_A_f_avg_poly_from_curve(C, N)
     for key, value in answer.items():
         print(key)
         print(value)

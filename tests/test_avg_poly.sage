@@ -20,7 +20,7 @@ class TestAvgPolyRandomP17To50(unittest.TestCase):
         for case in cases:
             with self.subTest(curve=str(case.curve)):
                 p = case.curve.base_ring().characteristic()
-                result = compute_A_f_avg_poly(case.curve, p)
+                result = compute_A_f_avg_poly_from_curve(case.curve, p)
 
                 A_f = result[p]
                 g = A_f.nrows()
