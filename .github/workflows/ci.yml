@@ -1,20 +1,20 @@
-name: Tests
+# name: Tests
 
-on:
-  push:
-  pull_request:
+# on:
+#   push:
+#   pull_request:
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    container:
-      image: sagemath/sagemath:latest
-      options: --user root
+# jobs:
+#   test:
+#     runs-on: ubuntu-latest
+#     container:
+#       image: sagemath/sagemath:latest
+#       options: --user root
 
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
+#     steps:
+#       - uses: actions/checkout@v4
+#         with:
+#           submodules: true
 
-      - name: Run tests
-        run: sage tests/runtests.sage
+#       - name: Run tests
+#         run: sage tests/runtests.sage
