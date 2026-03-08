@@ -1,4 +1,8 @@
-load("./P7-utils.sage")
+import os as _os
+if _os.path.exists("P7-utils.sage"):
+    load(_os.path.abspath("P7-utils.sage"))
+else:
+    load(_os.path.abspath("good-code/P7-utils.sage"))
 
 # Constructing the matrix on page 39 of notes (Section 7.3)
 def construct_T_bar_ijp(i, j, d, F_coeffs):
@@ -38,9 +42,7 @@ def divide_custom(x, y, p, R):
     return ans
 
 
-def compute_A_f_avg_poly(C, N):
-    F_coeffs, _ = C.hyperelliptic_polynomials()
-    d = C.degree()
+def compute_A_f_avg_poly(F_coeffs, d, N):
     g = (d-1) // 2
 
     p_to_mat = [{}, {}]
@@ -95,6 +97,9 @@ def compute_A_f_avg_poly(C, N):
 
     for p in range(N+1):
         if is_prime(p) and p > 5:
+            # Skip bad primes: p divides F_coeffs[0] means f has a root at x=0 mod p
+            if gcd(p, ZZ(F_coeffs[0])) != 1:
+                continue
 
             R = Zmod(p^2)
             m = (p-1)//2
@@ -147,13 +152,21 @@ def compute_A_f_avg_poly(C, N):
                 to_invert = int_products[l]*(F0_p2^(p-1))
                 acc = acc.apply_map(lambda x: divide_custom(x, to_invert, p, R))
                 
-                A_f.append(list(acc[0][(-g):]))
+                # reversed: acc entries are ordered right-to-left in Harvey's
+                # column convention, so the last entry corresponds to column 0
+                A_f.append(list(reversed(acc[0][(-g):])))
 
             A_f_p = Matrix(A_f).apply_map(lambda x: Integer(x) % (p))
             p_to_A_f[p] = A_f_p
     
     return p_to_A_f
 
+
+def compute_A_f_avg_poly_from_curve(C, N):
+    F_coeffs_poly, _ = C.hyperelliptic_polynomials()
+    d = C.degree()
+    F_coeffs = [Integer(c.lift()) for c in F_coeffs_poly]
+    return compute_A_f_avg_poly(F_coeffs, d, N)
 
 
 '''
@@ -162,17 +175,18 @@ Sqrt up to 50,000 took 1943 seconds (30 minutes)
 '''
         
     
-start = timer()
-N = 6300
-R.<x> = PolynomialRing(Integers())
-#f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
-f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
-C = HyperellipticCurve(f)
-answer = compute_A_f_avg_poly(C, N)
-for key, value in answer.items():
-    print(key)
-    print(value)
+import os as _os
+if 'P7-avg-poly' in _os.path.basename(sys.argv[0]):
+    start = timer()
+    N = 6300
+    R.<x> = PolynomialRing(Integers())
+    #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
+    f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
+    C = HyperellipticCurve(f)
+    answer = compute_A_f_avg_poly_from_curve(C, N)
+    for key, value in answer.items():
+        print(key)
+        print(value)
 
-
-time = timer() - start
-print(time)
+    time = timer() - start
+    print(time)
