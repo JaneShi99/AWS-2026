@@ -163,7 +163,7 @@ def compute_A_f_avg_poly(F_coeffs, N):
 
 def compute_A_f_avg_poly_from_curve(C, N):
     F_coeffs_poly, _ = C.hyperelliptic_polynomials()
-    F_coeffs = [Integer(c.lift()) for c in F_coeffs_poly]
+    F_coeffs = [Integer(c) for c in F_coeffs_poly]
     return compute_A_f_avg_poly(F_coeffs, N)
 
 
