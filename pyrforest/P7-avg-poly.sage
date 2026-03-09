@@ -1,7 +1,7 @@
 load("./P7-utils.sage")
 
 # Constructing the matrix on page 39 of notes (Section 7.3)
-# Builds m0 (j-part) and m1 (i-part) directly, then wraps as ZP2Matrix block [[m0,m1],[0,m0]].
+# Returns a plain 2d x 2d block matrix [[m0, m1], [0, m0]] over ZZ.
 def construct_T_bar_ijp(i, j, d, F_coeffs):
     m0 = matrix(ZZ, d, d)
     m1 = matrix(ZZ, d, d)
@@ -14,7 +14,8 @@ def construct_T_bar_ijp(i, j, d, F_coeffs):
         m0[k, d-1] = (d-k-2*j)*F_coeffs[d-k]
         m1[k, d-1] = (d-k-2*i)*F_coeffs[d-k]
 
-    return ZP2Matrix(m0, m1)
+    Z = matrix(ZZ, d, d)
+    return block_matrix([[m0, m1], [Z, m0]], subdivide=False)
 
 
 '''
@@ -61,14 +62,15 @@ def compute_A_f_avg_poly(F_coeffs, N):
         value_tree = build_product_tree(value_tree_leaves)
         modulus_tree = build_product_tree([k^2 if is_prime(k) else 1 for k in range(1, N+1)])
 
-        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZP2Matrix.identity(ZZ, d))
+        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = matrix.identity(ZZ, 2*d))
         
 
         for p in range(N+1):
             if is_prime(p) and p != 2:
-                T_bar = leaf_val_list[p-1]
-                # Access m0, m1 blocks directly: T_bar_int = m0 + p*m1
-                T_bar_int = T_bar.m0 + p * T_bar.m1
+                T_bar = leaf_val_list[p-1]  # plain 2d x 2d matrix
+                m0 = T_bar[:d, :d]
+                m1 = T_bar[:d, d:]
+                T_bar_int = m0 + p * m1
                 T_bar_mod_p2 = T_bar_int.apply_map(lambda x: Zmod(p^2)(x))
                 T_mod_p2 = T_bar_mod_p2.apply_map(lambda x: Zmod(p^2)(x * inverse_mod(2^(p-1), p^2)))
                 p_to_mat[i][p] = T_mod_p2
@@ -78,19 +80,18 @@ def compute_A_f_avg_poly(F_coeffs, N):
         value_tree_leaves = []
 
         for k in range(1, N+1):
-            int_i_j = ZP2(k, i)
+            int_i_j = matrix(ZZ, 2, 2, [k, i, 0, k])
             value_tree_leaves.append(int_i_j)
         
         value_tree = build_product_tree(value_tree_leaves)
         modulus_tree = build_product_tree([k^2 if is_prime(k) else 1 for k in range(1, N+1)])
 
-        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZP2(1,0))
+        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = matrix.identity(ZZ, 2))
 
         for p in range(N+1):
             if is_prime(p) and p != 2:
-                T_bar = leaf_val_list[p-1]
-                # Access x, y from the 2x2 block directly: value = x + p*y
-                p_to_int[i][p] = Zmod(p^2)(T_bar.x + p * T_bar.y)
+                T_bar = leaf_val_list[p-1]  # plain 2x2 matrix
+                p_to_int[i][p] = Zmod(p^2)(T_bar[0,0] + p * T_bar[0,1])
     
     
 

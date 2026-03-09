@@ -97,9 +97,6 @@ def compute_A_f_avg_poly(F_coeffs, d, N):
 
     for p in range(N+1):
         if is_prime(p) and p > 5:
-            # Skip bad primes: p divides F_coeffs[0] means f has a root at x=0 mod p
-            if gcd(p, ZZ(F_coeffs[0])) != 1:
-                continue
 
             R = Zmod(p^2)
             m = (p-1)//2
