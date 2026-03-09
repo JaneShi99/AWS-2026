@@ -1,5 +1,10 @@
 load("./P7-utils.sage")
 from pyrforest import remainder_forest
+import os as _os
+if _os.path.exists("P7-utils.sage"):
+    load(_os.path.abspath("P7-utils.sage"))
+else:
+    load(_os.path.abspath("good-code/P7-utils.sage"))
 
 # Build the 2d x 2d polynomial matrix M(x) over ZZ[x] for the matrix remainder tree.
 # x represents the loop variable j. The matrix is [[m0(x), m1], [0, m0(x)]]
@@ -142,7 +147,7 @@ def compute_A_f_avg_poly(F_coeffs, N):
                 to_invert = int_products[l]*(F0_p2^(p-1))
                 acc = acc.apply_map(lambda v: divide_custom(v, to_invert, p, R))
                 
-                A_f.append(list(acc[0][(-g):]))
+                A_f.append(list(reversed(acc[0][(-g):])))
 
             A_f_p = Matrix(A_f).apply_map(lambda v: Integer(v) % (p))
             p_to_A_f[p] = A_f_p
@@ -156,17 +161,19 @@ AVG poly up to 50,000 took 59 seconds
 Sqrt up to 50,000 took 1943 seconds (30 minutes) 
 '''
         
-    
-start = timer()
-N = 6300
-R.<x> = PolynomialRing(Integers())
-#f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
-f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
-answer = compute_A_f_avg_poly(f.list(), N)
-for key, value in answer.items():
-    print(key)
-    print(value)
+   
+import os as _os
+if 'P7-avg-poly' in _os.path.basename(sys.argv[0]):
+    start = timer()
+    N = 6300
+    R.<x> = PolynomialRing(Integers())
+    #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
+    f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
+    C = HyperellipticCurve(f)
+    answer = compute_A_f_avg_poly_from_curve(C, N)
+    for key, value in answer.items():
+        print(key)
+        print(value)
 
-
-time = timer() - start
-print(time)
+    time = timer() - start
+    print(time)
