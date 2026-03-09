@@ -90,7 +90,7 @@ def evaluation_tree(evaluation_poly, values, p):
 '''
 Compute the single matrix T_k (See 6.2.2. in Section 6.2. solving recurrences in sqrt time)
 '''
-def generate_T_matrix(p, k_val, d, m, F_coeffs):
+def generate_T_matrix_squareroot(p, k_val, d, m, F_coeffs):
     R.<k> = PolynomialRing(Zmod(p^mu))
     sub = R(k_val) * F_coeffs[0]
     M = matrix(R, d, d)
@@ -109,7 +109,7 @@ Using fast matrix product. Corresponds to problem 6.2.4. Part a)
 '''
 def compute_reusable_T_product(p, t, F_coeffs, m, d, R):
     k = R.gen()
-    T_matrices = [generate_T_matrix(p,k+i,d,m,F_coeffs) for i in range(1,t+1)]
+    T_matrices = [generate_T_matrix_squareroot(p,k+i,d,m,F_coeffs) for i in range(1,t+1)]
     T_product = fast_product(T_matrices)
 
     return T_product
@@ -136,7 +136,7 @@ def compute_T_product(p, k0, s, t, t_prime,F_coeffs, m, d, R, reusable_T):
     total_mat_prod_t_squared = fast_product(mat_vals)
 
     #compute the product of the "leftover" matrices T_(k0+t^2+1)...T_(k0+s)
-    T_matrices_left = [generate_T_matrix(p, idx, d, m, F_coeffs) for idx in range(k0+t^2+1, k0+s+1)]
+    T_matrices_left = [generate_T_matrix_squareroot(p, idx, d, m, F_coeffs) for idx in range(k0+t^2+1, k0+s+1)]
 
     #combine all the products
     if T_matrices_left:
@@ -235,7 +235,7 @@ def compute_A_f_fast(F_coeffs, p):
         if i == 0:
             acc[0, -1] = R(F0^m)
         else:
-            T_single = generate_T_matrix(p, p*i, d, m, F_coeffs)
+            T_single = generate_T_matrix_squareroot(p, p*i, d, m, F_coeffs)
             
             Hk = acc * T_single[:, -1]
             to_invert = i*p*F0
@@ -281,7 +281,9 @@ def exp3():
 
 '''
 AVG poly up to 50,000 took 59 seconds
-Sqrt up to 50,000 took 1943 seconds (30 minutes) 
+Sqrt up to 50,000 took 1943 seconds (30 minutes)
 '''
 
-exp3()
+import os as _os
+if 'P6-Af' in _os.path.basename(sys.argv[0]):
+    exp3()
