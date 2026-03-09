@@ -45,102 +45,151 @@ def remainder_tree_builder(value_tree, modulus_tree, identity = 1):
 
     return recursive_helper(value_tree, modulus_tree, identity, True, -1), leave_val_list
 
-# This can be genealized for R[P]/P^mu with mu being a variable.
+# This can be generalized for R[P]/P^mu with mu being a variable.
 class ZP2:
-    """Element of R[P]/(P^2), stored as (x, y) representing x + y*P."""
-    __slots__ = ["x", "y"]
+    """Element of R[P]/(P^2), stored as the 2x2 block matrix [[x, y], [0, x]].
+    Represents x + y*P. Arithmetic is handled by native matrix operations."""
+    __slots__ = ["mat"]
 
     def __init__(self, x, y=0):
-        self.x = x
-        self.y = y
+        self.mat = matrix(ZZ, 2, 2, [x, y, 0, x])
+
+    @property
+    def x(self):
+        return self.mat[0, 0]
+
+    @property
+    def y(self):
+        return self.mat[0, 1]
 
     def __add__(self, other):
-        return ZP2(self.x + other.x, self.y + other.y)
+        result = ZP2.__new__(ZP2)
+        result.mat = self.mat + other.mat
+        return result
 
     def __sub__(self, other):
-        return ZP2(self.x - other.x, self.y - other.y)
+        result = ZP2.__new__(ZP2)
+        result.mat = self.mat - other.mat
+        return result
 
     def __mul__(self, other):
-        return ZP2(self.x * other.x, self.x * other.y + self.y * other.x)
+        result = ZP2.__new__(ZP2)
+        result.mat = self.mat * other.mat
+        return result
 
     def __neg__(self):
-        return ZP2(-self.x, -self.y)
+        result = ZP2.__new__(ZP2)
+        result.mat = -self.mat
+        return result
 
     def __mod__(self, n):
-        return ZP2(self.x % n, self.y % n)
+        result = ZP2.__new__(ZP2)
+        result.mat = self.mat.apply_map(lambda v: v % n)
+        return result
 
     def __repr__(self):
         return f"({self.x}) + ({self.y})*P"
 
     def __eq__(self, other):
-        return self.x == other.x and self.y == other.y
+        return self.mat == other.mat
 
     def scalar_mul(self, c):
         """Multiply by a scalar (element of the base ring)."""
-        return ZP2(c * self.x, c * self.y)
+        result = ZP2.__new__(ZP2)
+        result.mat = c * self.mat
+        return result
 
     def realize(self, p):
         """Evaluate at P=p to get a concrete value."""
         return self.x + self.y * p
 
 
-# This can be genealized for R[P]/P^mu with mu being a variable.
+# This can be generalized for R[P]/P^mu with mu being a variable.
 class ZP2Matrix:
-    """Matrix over R[P]/(P^2), stored as two Sage matrices (M0, M1).
-    Represents M0 + M1*P. Uses Sage's fast matrix arithmetic internally."""
-    __slots__ = ["m0", "m1"]
+    """Matrix over R[P]/(P^2), stored as a single 2n x 2n block matrix
+        [[m0, m1],
+         [ 0, m0]]
+    Represents M0 + M1*P. Arithmetic is handled by native matrix operations
+    on the block matrix."""
+    __slots__ = ["_mat", "_n_rows", "_n_cols"]
 
     def __init__(self, m0, m1):
-        self.m0 = m0  # constant part (Sage matrix over base ring)
-        self.m1 = m1  # coefficient of P (Sage matrix over base ring)
+        """Construct from the two component matrices m0, m1."""
+        nr, nc = m0.nrows(), m0.ncols()
+        self._n_rows = nr
+        self._n_cols = nc
+        self._mat = block_matrix([[m0, m1], [matrix(m0.base_ring(), nr, nc), m0]], subdivide=False)
+
+    @staticmethod
+    def _from_block(mat, nr, nc):
+        """Internal: wrap an already-built 2n x 2n block matrix."""
+        result = ZP2Matrix.__new__(ZP2Matrix)
+        result._mat = mat
+        result._n_rows = nr
+        result._n_cols = nc
+        return result
+
+    @property
+    def m0(self):
+        """The constant part (top-left block)."""
+        nr, nc = self._n_rows, self._n_cols
+        return self._mat[:nr, :nc]
+
+    @property
+    def m1(self):
+        """The coefficient of P (top-right block)."""
+        nr, nc = self._n_rows, self._n_cols
+        return self._mat[:nr, nc:]
 
     def __add__(self, other):
-        return ZP2Matrix(self.m0 + other.m0, self.m1 + other.m1)
+        return ZP2Matrix._from_block(self._mat + other._mat, self._n_rows, self._n_cols)
 
     def __sub__(self, other):
-        return ZP2Matrix(self.m0 - other.m0, self.m1 - other.m1)
+        return ZP2Matrix._from_block(self._mat - other._mat, self._n_rows, self._n_cols)
 
     def __mul__(self, other):
-        # (A0 + A1*P)(B0 + B1*P) = A0*B0 + (A0*B1 + A1*B0)*P
-        return ZP2Matrix(
-            self.m0 * other.m0,
-            self.m0 * other.m1 + self.m1 * other.m0
-        )
+        # Block multiply: [[a0,a1],[0,a0]] * [[b0,b1],[0,b0]]
+        # = [[a0*b0, a0*b1+a1*b0], [0, a0*b0]]  -- exactly the Z/P^2 rule
+        return ZP2Matrix._from_block(self._mat * other._mat, self._n_rows, other._n_cols)
 
     def __neg__(self):
-        return ZP2Matrix(-self.m0, -self.m1)
+        return ZP2Matrix._from_block(-self._mat, self._n_rows, self._n_cols)
 
     def __mod__(self, n):
-        return ZP2Matrix(self.m0.apply_map(lambda x: x % n), self.m1.apply_map(lambda x: x % n))
+        return ZP2Matrix._from_block(self._mat.apply_map(lambda v: v % n), self._n_rows, self._n_cols)
 
     def scalar_mul(self, zp2_scalar):
-        """Multiply every entry by a ZP2 scalar (x + y*P)."""
-        return ZP2Matrix(
-            zp2_scalar.x * self.m0,
-            zp2_scalar.x * self.m1 + zp2_scalar.y * self.m0
-        )
+        """Multiply every entry by a ZP2 scalar (x + y*P).
+        Result: s0*[[m0,m1],[0,m0]] + s1*[[0,m0],[0,0]]
+              = [[s0*m0, s0*m1+s1*m0], [0, s0*m0]]."""
+        nr, nc = self._n_rows, self._n_cols
+        base = self._mat.base_ring()
+        Z = matrix(base, nr, nc)
+        correction = block_matrix([[Z, self.m0], [Z, Z]], subdivide=False)
+        return ZP2Matrix._from_block(
+            zp2_scalar.x * self._mat + zp2_scalar.y * correction,
+            nr, nc)
 
     def realize(self, p):
         """Evaluate at P=p to get a concrete Sage matrix."""
         return self.m0 + p * self.m1
 
     def __repr__(self):
-        return f"ZP2Matrix:\n  M0 = {self.m0}\n  M1 = {self.m1}"
+        return f"ZP2Matrix (block form):\n  M0 = {self.m0}\n  M1 = {self.m1}"
 
     @staticmethod
     def zero(base_ring, nrows, ncols):
         """Create a zero ZP2Matrix."""
-        z = matrix(base_ring, nrows, ncols)
-        return ZP2Matrix(z, copy(z))
+        return ZP2Matrix._from_block(matrix(base_ring, 2*nrows, 2*ncols), nrows, ncols)
 
     @staticmethod
     def from_array(base_ring, arr):
-        """Convert an n×n list-of-lists of ZP2 elements into a ZP2Matrix.
-        
+        """Convert an n x m list-of-lists of ZP2 elements into a ZP2Matrix.
+
         Usage:
             arr = [[ZP2(1,2), ZP2(3,4)],
                    [ZP2(5,6), ZP2(7,8)]]
-            M = ZP2Matrix.from_array(Zmod(p^3), arr)
+            M = ZP2Matrix.from_array(ZZ, arr)
         """
         nrows = len(arr)
         ncols = len(arr[0])
@@ -154,7 +203,7 @@ class ZP2Matrix:
         return ZP2Matrix(matrix.identity(base_ring, n), matrix(base_ring, n, n))
 
     def nrows(self):
-        return self.m0.nrows()
+        return self._n_rows
 
     def ncols(self):
-        return self.m0.ncols()
+        return self._n_cols

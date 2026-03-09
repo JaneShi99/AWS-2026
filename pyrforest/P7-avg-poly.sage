@@ -1,16 +1,20 @@
 load("./P7-utils.sage")
 
 # Constructing the matrix on page 39 of notes (Section 7.3)
+# Builds m0 (j-part) and m1 (i-part) directly, then wraps as ZP2Matrix block [[m0,m1],[0,m0]].
 def construct_T_bar_ijp(i, j, d, F_coeffs):
-    arr = [[ZP2(0, 0) for _ in range(d)] for _ in range(d)]
+    m0 = matrix(ZZ, d, d)
+    m1 = matrix(ZZ, d, d)
 
     for k in range(1, d):
-        arr[k][k-1] = ZP2(2*j*F_coeffs[0], 2*i*F_coeffs[0])
+        m0[k, k-1] = 2*j*F_coeffs[0]
+        m1[k, k-1] = 2*i*F_coeffs[0]
     
     for k in range(d):
-        arr[k][d-1] = ZP2((d-k-2*j)*F_coeffs[d-k], (d-k-2*i)*F_coeffs[d-k])
+        m0[k, d-1] = (d-k-2*j)*F_coeffs[d-k]
+        m1[k, d-1] = (d-k-2*i)*F_coeffs[d-k]
 
-    return ZP2Matrix.from_array(ZZ, arr)
+    return ZP2Matrix(m0, m1)
 
 
 '''
@@ -63,7 +67,8 @@ def compute_A_f_avg_poly(F_coeffs, N):
         for p in range(N+1):
             if is_prime(p) and p != 2:
                 T_bar = leaf_val_list[p-1]
-                T_bar_int = T_bar.realize(p)
+                # Access m0, m1 blocks directly: T_bar_int = m0 + p*m1
+                T_bar_int = T_bar.m0 + p * T_bar.m1
                 T_bar_mod_p2 = T_bar_int.apply_map(lambda x: Zmod(p^2)(x))
                 T_mod_p2 = T_bar_mod_p2.apply_map(lambda x: Zmod(p^2)(x * inverse_mod(2^(p-1), p^2)))
                 p_to_mat[i][p] = T_mod_p2
@@ -84,8 +89,8 @@ def compute_A_f_avg_poly(F_coeffs, N):
         for p in range(N+1):
             if is_prime(p) and p != 2:
                 T_bar = leaf_val_list[p-1]
-                T_bar_int = T_bar.realize(p)
-                p_to_int[i][p] = Zmod(p^2)(T_bar_int)
+                # Access x, y from the 2x2 block directly: value = x + p*y
+                p_to_int[i][p] = Zmod(p^2)(T_bar.x + p * T_bar.y)
     
     
 
