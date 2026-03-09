@@ -1,10 +1,9 @@
-load("./P7-utils.sage")
 from pyrforest import remainder_forest
 import os as _os
-if _os.path.exists("P7-utils.sage"):
+if _os.path.exists("pyrforest/P7-utils.sage"):
+    load(_os.path.abspath("pyrforest/P7-utils.sage"))
+elif _os.path.exists("P7-utils.sage"):
     load(_os.path.abspath("P7-utils.sage"))
-else:
-    load(_os.path.abspath("good-code/P7-utils.sage"))
 
 # Build the 2d x 2d polynomial matrix M(x) over ZZ[x] for the matrix remainder tree.
 # x represents the loop variable j. The matrix is [[m0(x), m1], [0, m0(x)]]
@@ -95,6 +94,12 @@ def compute_A_f_avg_poly(F_coeffs, N):
 
     for p in range(N+1):
         if is_prime(p) and p > 5:
+            # Skip bad primes: p divides F_coeffs[0] means f has a root at x=0 mod p
+            if gcd(p, ZZ(F_coeffs[0])) != 1:
+                continue
+            # doesn't work if p < g
+            if p < g:
+                continue
 
             R = Zmod(p^2)
             m = (p-1)//2
@@ -154,6 +159,12 @@ def compute_A_f_avg_poly(F_coeffs, N):
     
     return p_to_A_f
 
+
+
+def compute_A_f_avg_poly_from_curve(C, N):
+    F_coeffs_poly, _ = C.hyperelliptic_polynomials()
+    F_coeffs = [Integer(c.lift()) for c in F_coeffs_poly]
+    return compute_A_f_avg_poly(F_coeffs, N)
 
 
 '''
