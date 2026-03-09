@@ -145,7 +145,7 @@ def compute_A_f_avg_poly(F_coeffs, N):
 
                 acc = acc * sprint_matrices[l]
                 to_invert = int_products[l]*(F0_p2^(p-1))
-                acc = acc.apply_map(lambda v: divide_custom(v, to_invert, p, R))
+                acc = acc.apply_map(lambda x: x*to_invert^(-1))
                 
                 A_f.append(list(reversed(acc[0][(-g):])))
 
