@@ -1,18 +1,28 @@
+from pyrforest import remainder_forest
 import os as _os
-from typing import reveal_type
-load(_os.path.abspath("P8-utils.sage"))
+if _os.path.exists("pyrforest/P7-utils.sage"):
+    load(_os.path.abspath("pyrforest/P7-utils.sage"))
+elif _os.path.exists("P7-utils.sage"):
+    load(_os.path.abspath("P7-utils.sage"))
 
-# Constructing the matrix on page 39 of notes (Section 7.3)
-def construct_T_bar_ijp(i, j, d, F_coeffs, mu=2):
-    arr = [[ZPmu([0, 0], mu) for _ in range(d)] for _ in range(d)]
+# Build the 2d x 2d polynomial matrix M(x) over ZZ[x] for the matrix remainder tree.
+# x represents the loop variable j. The matrix is [[m0(x), m1], [0, m0(x)]]
+# where m0 depends linearly on x and m1 is constant (depends only on i).
+def construct_T_bar_poly(i, d, F_coeffs, P):
+    x = P.gen()
+    m0 = matrix(P, d, d)
+    m1 = matrix(ZZ, d, d)
 
     for k in range(1, d):
-        arr[k][k-1] = ZPmu([2*j*F_coeffs[0], 2*i*F_coeffs[0]], mu)
+        m0[k, k-1] = 2*x*F_coeffs[0]
+        m1[k, k-1] = 2*i*F_coeffs[0]
     
     for k in range(d):
-        arr[k][d-1] = ZPmu([(d-k-2*j)*F_coeffs[d-k], (d-k-2*i)*F_coeffs[d-k]], mu)
+        m0[k, d-1] = (d-k)*F_coeffs[d-k] - 2*x*F_coeffs[d-k]
+        m1[k, d-1] = (d-k-2*i)*F_coeffs[d-k]
 
-    return ZPmuMatrix.from_array(ZZ, arr, mu)
+    Z = matrix(P, d, d)
+    return block_matrix([[m0, m1], [Z, m0]], subdivide=False)
 
 
 '''
@@ -40,56 +50,41 @@ def divide_custom(x, y, p, R):
     return ans
 
 
-def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
-    g = (d - 1)//2
-    if mu != 2:
-        lam: Integer = ceil(g/2)
-        mu = lam + 1
-    dl = (2*ell + 1)*(g + 1) - 1
+def compute_A_f_avg_poly(F_coeffs, N):
+
+    d = len(F_coeffs) - 1
+    g = (d-1) // 2
+
+    P.<x> = ZZ[]
+    primes_list = [p for p in prime_range(3, N+1)]
+    m_func = lambda p: p^2
+    k_func = lambda p: p
 
     p_to_mat = [{}, {}]
     p_to_int = [{}, {}]
 
-    # make the acc. remainder tree for matrices
-    for i in [0..(mu - 1)]:
-        value_tree_leaves = [ZPmuMatrix.identity(ZZ, d, mu) for _ in range(d*ell)]
-
-        for j in [(d*ell + 1)..N]:
-            T_bar_ijp = construct_T_bar_ijp(i, j - d*ell, d, F_coeffs, mu)
-            value_tree_leaves.append(T_bar_ijp)
-
-        value_tree = build_product_tree(value_tree_leaves)
-        modulus_tree = build_product_tree([k^mu if is_prime(k) else 1 for k in range(1, N+1)])
-
-        _, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZPmuMatrix.identity(ZZ, d, mu))
-        
-
-        for p in range(N+1):
-            if is_prime(p) and p > 4*g:
-                T_bar = leaf_val_list[p-1]
-                T_bar_int = T_bar.realize(p)
-                T_bar_mod_p_mu = T_bar_int.apply_map(lambda x: Zmod(p^mu)(x))
-                T_mod_p_mu = T_bar_mod_p_mu.apply_map(lambda x: Zmod(p^mu)(x * inverse_mod(2^(p-d*ell-1), p^mu)))
-                p_to_mat[i][p] = T_mod_p_mu
-    
-    #make the acc remainder tree for integers
+    # remainder forest for matrices
     for i in [0, 1]:
-        value_tree_leaves = []
+        M_poly = construct_T_bar_poly(i, d, F_coeffs, P)
+        forest = remainder_forest(M_poly, m_func, k_func, kbase=1, indices=primes_list)
 
-        for k in range(1, N+1):
-            int_i_j = ZPmu([k, i], mu)
-            value_tree_leaves.append(int_i_j)
-        
-        value_tree = build_product_tree(value_tree_leaves)
-        modulus_tree = build_product_tree([k^2 if is_prime(k) else 1 for k in range(1, N+1)])
+        for p in primes_list:
+            T_bar = forest[p]  # plain 2d x 2d integer matrix mod p^2
+            m0 = T_bar[:d, :d]
+            m1 = T_bar[:d, d:]
+            T_bar_int = m0 + p * m1
+            T_bar_mod_p2 = T_bar_int.apply_map(lambda v: Zmod(p^2)(v))
+            T_mod_p2 = T_bar_mod_p2.apply_map(lambda v: Zmod(p^2)(v * inverse_mod(2^(p-1), p^2)))
+            p_to_mat[i][p] = T_mod_p2
 
-        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZPmu([1], mu))
+    # remainder forest for integer products
+    for i in [0, 1]:
+        M_int = matrix(P, 2, 2, [x, i, 0, x])
+        forest = remainder_forest(M_int, m_func, k_func, kbase=1, indices=primes_list)
 
-        for p in range(N+1):
-            if is_prime(p) and p != 2:
-                T_bar = leaf_val_list[p-1]
-                T_bar_int = T_bar.realize(p)
-                p_to_int[i][p] = Zmod(p^2)(T_bar_int)
+        for p in primes_list:
+            T_bar = forest[p]  # plain 2x2 integer matrix mod p^2
+            p_to_int[i][p] = Zmod(p^2)(T_bar[0,0] + p * T_bar[0,1])
     
     
 
@@ -118,7 +113,7 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
             R_p = p_to_mat[1][p]
 
             Rp_minus_R0 = R_p - R_0
-            R_1 = Rp_minus_R0.apply_map(lambda x: R(Integer(x)/p))
+            R_1 = Rp_minus_R0.apply_map(lambda v: R(Integer(v)/p))
             sprint_matrices = [R_0 + (l*p)*R_1 for l in range(0, g)]
 
             int_0 = p_to_int[0][p]
@@ -149,28 +144,27 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
 
                     Hk = acc * T_single[:,-1]
                     to_invert = l*p*F0_p2 
-                    Hk = Hk.apply_map(lambda x: divide_custom(x, to_invert, p, R))
+                    Hk = Hk.apply_map(lambda v: divide_custom(v, to_invert, p, R))
                     acc_new = [acc[0][i] for i in range(1, len(acc[0]))] + [Hk[0][0]]
                     acc = Matrix(R, 1, d, acc_new)
 
                 acc = acc * sprint_matrices[l]
                 to_invert = int_products[l]*(F0_p2^(p-1))
                 acc = acc.apply_map(lambda x: x*to_invert^(-1))
-                # reversed: acc entries are ordered right-to-left in Harvey's
-                # column convention, so the last entry corresponds to column 0
+                
                 A_f.append(list(reversed(acc[0][(-g):])))
 
-            A_f_p = Matrix(A_f).apply_map(lambda x: Integer(x) % (p))
+            A_f_p = Matrix(A_f).apply_map(lambda v: Integer(v) % (p))
             p_to_A_f[p] = A_f_p
     
     return p_to_A_f
 
 
-def compute_A_f_avg_poly_from_curve(C, N, mu=2):
+
+def compute_A_f_avg_poly_from_curve(C, N):
     F_coeffs_poly, _ = C.hyperelliptic_polynomials()
-    d = C.degree()
     F_coeffs = [Integer(c) for c in F_coeffs_poly]
-    return compute_A_F_l_avg_poly(F_coeffs, d, N, 0, mu)
+    return compute_A_f_avg_poly(F_coeffs, N)
 
 
 '''
@@ -178,13 +172,12 @@ AVG poly up to 50,000 took 59 seconds
 Sqrt up to 50,000 took 1943 seconds (30 minutes) 
 '''
         
-    
+   
 import os as _os
-if 'P8-avg-poly' in _os.path.basename(sys.argv[0]):
+if 'P7-avg-poly' in _os.path.basename(sys.argv[0]):
     start = timer()
-    N = 1000
-    R = PolynomialRing(Integers(), 'x')
-    x = R.gen()
+    N = 6300
+    R.<x> = PolynomialRing(Integers())
     #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
     f =  -(x^12 - x^10 + 6*x^9 - 7*x^8 + 5*x^7 + x^6 - x^5 + x^4 - x^3 + x^2 - x + 1)
     C = HyperellipticCurve(f)
