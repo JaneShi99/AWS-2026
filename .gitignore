@@ -1,3 +1,4 @@
 *.sage.py
 *.png
 .DS_Store
+*.pdf
