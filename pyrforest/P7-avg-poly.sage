@@ -73,8 +73,9 @@ def compute_A_f_avg_poly(F_coeffs, N):
             m0 = T_bar[:d, :d]
             m1 = T_bar[:d, d:]
             T_bar_int = m0 + p * m1
-            T_bar_mod_p2 = T_bar_int.apply_map(lambda v: Zmod(p^2)(v))
-            T_mod_p2 = T_bar_mod_p2.apply_map(lambda v: Zmod(p^2)(v * inverse_mod(2^(p-1), p^2)))
+            Rp2 = Zmod(p^2)
+            inv = inverse_mod(2^(p-1), p^2)
+            T_mod_p2 = T_bar_int.apply_map(lambda v: Rp2(v * inv))
             p_to_mat[i][p] = T_mod_p2
 
     # remainder forest for integer products
@@ -84,7 +85,8 @@ def compute_A_f_avg_poly(F_coeffs, N):
 
         for p in primes_list:
             T_bar = forest[p]  # plain 2x2 integer matrix mod p^2
-            p_to_int[i][p] = Zmod(p^2)(T_bar[0,0] + p * T_bar[0,1])
+            Rp2 = Zmod(p^2)
+            p_to_int[i][p] = Rp2(T_bar[0,0] + p * T_bar[0,1])
     
     
 
@@ -92,70 +94,63 @@ def compute_A_f_avg_poly(F_coeffs, N):
 
     p_to_A_f = {}
 
-    for p in range(N+1):
-        if is_prime(p) and p > 5:
-            # Skip bad primes: p divides F_coeffs[0] means f has a root at x=0 mod p
-            if gcd(p, ZZ(F_coeffs[0])) != 1:
-                continue
-            # doesn't work if p < g
-            if p < g:
-                continue
+    for p in primes_list:
+        if p <= 5:
+            continue
+        # Skip bad primes: p divides F_coeffs[0] means f has a root at x=0 mod p
+        if gcd(p, ZZ(F_coeffs[0])) != 1:
+            continue
+        # doesn't work if p < g
+        if p < g:
+            continue
 
-            R = Zmod(p^2)
-            m = (p-1)//2
+        R = Zmod(p^2)
+        m = (p-1)//2
 
-            F_coeffs_p2 = [R(c) for c in F_coeffs]
-            F0_p2 = R(F_coeffs_p2[0])
+        F_coeffs_p2 = [R(c) for c in F_coeffs]
+        F0_p2 = R(F_coeffs_p2[0])
 
-            acc = Matrix(R, 1, d)
+        acc = Matrix(R, 1, d)
 
-            R_0 = p_to_mat[0][p]
-            R_p = p_to_mat[1][p]
+        R_0 = p_to_mat[0][p]
+        R_p = p_to_mat[1][p]
 
-            Rp_minus_R0 = R_p - R_0
-            R_1 = Rp_minus_R0.apply_map(lambda v: R(Integer(v)/p))
-            sprint_matrices = [R_0 + (l*p)*R_1 for l in range(0, g)]
+        Rp_minus_R0 = R_p - R_0
+        R_1 = Rp_minus_R0.apply_map(lambda v: R(Integer(v)/p))
+        sprint_matrices = [R_0 + (l*p)*R_1 for l in range(0, g)]
 
-            int_0 = p_to_int[0][p]
-            int_p = p_to_int[1][p]
+        int_0 = p_to_int[0][p]
+        int_p = p_to_int[1][p]
 
-            int_p_minus_int_0 = int_p - int_0
-            int_1 = R(Integer(int_p_minus_int_0)/p)
+        int_p_minus_int_0 = int_p - int_0
+        int_1 = R(Integer(int_p_minus_int_0)/p)
 
-            int_products = [int_0 + (l*p)*int_1 for l in range(0, g)]
+        int_products = [int_0 + (l*p)*int_1 for l in range(0, g)]
 
-            A_f = []
+        A_f = []
+
+        for l in range(0, g):
+            # the following step is to compute the single step 
+            # U_(ip) = U_(ip-1)*T_(ip)*(constants)
+            if l == 0:
+                acc[0, -1] = R(F0_p2^m)
+            else:
+                T_single = generate_T_matrix(p, p*l, d, m, F_coeffs, R)
+
+                Hk = acc * T_single[:,-1]
+                to_invert = l*p*F0_p2 
+                Hk = Hk.apply_map(lambda v: divide_custom(v, to_invert, p, R))
+                acc_new = [acc[0][i] for i in range(1, len(acc[0]))] + [Hk[0][0]]
+                acc = Matrix(R, 1, d, acc_new)
+
+            acc = acc * sprint_matrices[l]
+            inv = (int_products[l]*(F0_p2^(p-1)))^(-1)
+            acc = acc.apply_map(lambda x: x*inv)
             
-            '''
-            for mat in sprint_matrices:
-                print(mat)
-                print("\n")
-            print("int")
-            print(int_products)
-            '''
+            A_f.append(list(reversed(acc[0][(-g):])))
 
-            for l in range(0, g):
-                # the following step is to compute the single step 
-                # U_(ip) = U_(ip-1)*T_(ip)*(constants)
-                if l == 0:
-                    acc[0, -1] = R(F0_p2^m)
-                else:
-                    T_single = generate_T_matrix(p, p*l, d, m, F_coeffs, R)
-
-                    Hk = acc * T_single[:,-1]
-                    to_invert = l*p*F0_p2 
-                    Hk = Hk.apply_map(lambda v: divide_custom(v, to_invert, p, R))
-                    acc_new = [acc[0][i] for i in range(1, len(acc[0]))] + [Hk[0][0]]
-                    acc = Matrix(R, 1, d, acc_new)
-
-                acc = acc * sprint_matrices[l]
-                to_invert = int_products[l]*(F0_p2^(p-1))
-                acc = acc.apply_map(lambda x: x*to_invert^(-1))
-                
-                A_f.append(list(reversed(acc[0][(-g):])))
-
-            A_f_p = Matrix(A_f).apply_map(lambda v: Integer(v) % (p))
-            p_to_A_f[p] = A_f_p
+        A_f_p = Matrix(A_f).apply_map(lambda v: Integer(v) % (p))
+        p_to_A_f[p] = A_f_p
     
     return p_to_A_f
 
