@@ -1,20 +1,20 @@
 import os as _os
-if _os.path.exists("P7-utils.sage"):
-    load(_os.path.abspath("P7-utils.sage"))
+if _os.path.exists("P8-utils.sage"):
+    load(_os.path.abspath("P8-utils.sage"))
 else:
-    load(_os.path.abspath("good-code/P7-utils.sage"))
+    load(_os.path.abspath("good-code/P8-utils.sage"))
 
 # Constructing the matrix on page 39 of notes (Section 7.3)
-def construct_T_bar_ijp(i, j, d, F_coeffs):
-    arr = [[ZP2(0, 0) for _ in range(d)] for _ in range(d)]
+def construct_T_bar_ijp(i, j, d, F_coeffs, mu=2):
+    arr = [[ZPmu([0, 0], mu) for _ in range(d)] for _ in range(d)]
 
     for k in range(1, d):
-        arr[k][k-1] = ZP2(2*j*F_coeffs[0], 2*i*F_coeffs[0])
+        arr[k][k-1] = ZPmu([2*j*F_coeffs[0], 2*i*F_coeffs[0]], mu)
     
     for k in range(d):
-        arr[k][d-1] = ZP2((d-k-2*j)*F_coeffs[d-k], (d-k-2*i)*F_coeffs[d-k])
+        arr[k][d-1] = ZPmu([(d-k-2*j)*F_coeffs[d-k], (d-k-2*i)*F_coeffs[d-k]], mu)
 
-    return ZP2Matrix.from_array(ZZ, arr)
+    return ZPmuMatrix.from_array(ZZ, arr, mu)
 
 
 '''
@@ -42,7 +42,7 @@ def divide_custom(x, y, p, R):
     return ans
 
 
-def compute_A_f_avg_poly(F_coeffs, d, N):
+def compute_A_f_avg_poly(F_coeffs, d, N, mu=2):
     g = (d-1) // 2
 
     p_to_mat = [{}, {}]
@@ -53,13 +53,13 @@ def compute_A_f_avg_poly(F_coeffs, d, N):
         value_tree_leaves = []
 
         for j in range(1, N+1):
-            T_bar_ijp = construct_T_bar_ijp(i, j, d, F_coeffs)
+            T_bar_ijp = construct_T_bar_ijp(i, j, d, F_coeffs, mu)
             value_tree_leaves.append(T_bar_ijp)
 
         value_tree = build_product_tree(value_tree_leaves)
         modulus_tree = build_product_tree([k^2 if is_prime(k) else 1 for k in range(1, N+1)])
 
-        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZP2Matrix.identity(ZZ, d))
+        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZPmuMatrix.identity(ZZ, d, mu))
         
 
         for p in range(N+1):
@@ -75,13 +75,13 @@ def compute_A_f_avg_poly(F_coeffs, d, N):
         value_tree_leaves = []
 
         for k in range(1, N+1):
-            int_i_j = ZP2(k, i)
+            int_i_j = ZPmu([k, i], mu)
             value_tree_leaves.append(int_i_j)
         
         value_tree = build_product_tree(value_tree_leaves)
         modulus_tree = build_product_tree([k^2 if is_prime(k) else 1 for k in range(1, N+1)])
 
-        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZP2(1,0))
+        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZPmu([1], mu))
 
         for p in range(N+1):
             if is_prime(p) and p != 2:
@@ -164,11 +164,11 @@ def compute_A_f_avg_poly(F_coeffs, d, N):
     return p_to_A_f
 
 
-def compute_A_f_avg_poly_from_curve(C, N):
+def compute_A_f_avg_poly_from_curve(C, N, mu=2):
     F_coeffs_poly, _ = C.hyperelliptic_polynomials()
     d = C.degree()
-    F_coeffs = [ZZ(c) for c in F_coeffs_poly]
-    return compute_A_f_avg_poly(F_coeffs, d, N)
+    F_coeffs = [Integer(c) for c in F_coeffs_poly]
+    return compute_A_f_avg_poly(F_coeffs, d, N, mu)
 
 
 '''
@@ -178,7 +178,7 @@ Sqrt up to 50,000 took 1943 seconds (30 minutes)
         
     
 import os as _os
-if 'P7-avg-poly' in _os.path.basename(sys.argv[0]):
+if 'P8-avg-poly' in _os.path.basename(sys.argv[0]):
     start = timer()
     N = 6300
     R.<x> = PolynomialRing(Integers())
