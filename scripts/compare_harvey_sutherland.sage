@@ -5,8 +5,11 @@ Harvey-Sutherland implementation of compute_hasse_witt_matrices across
 a range of genera, using random even-degree (2g+2) hyperelliptic curves.
 
 The same random curves are used for both implementations at each genus so
-the comparison is fair.  A power-law T(g) ≈ A·g^α is fitted to each series
-and both are overlaid on a single plot.
+the comparison is fair.  Each (genus, implementation) pair runs in its own
+fresh subprocess via multiprocessing (fork, maxtasksperchild=1).  Timing
+results are collected silently and printed together at the end.  A
+power-law T(g) ≈ A·g^α is fitted to each series and both are overlaid on
+a single plot.
 
 Usage (run from repo root):
     sage scripts/compare_harvey_sutherland.sage <g_min> <g_max> <n_per_genus> <N_max>
@@ -24,7 +27,8 @@ Arguments:
 Notes:
     - Curves are generated over GF(p) where p = next_prime(max(g, 5)),
       guaranteeing p > g and p > 5.  If p is bad for a curve a new one is drawn.
-    - The same curve instances are timed against both implementations.
+    - The same curve instances (as coefficient lists) are timed against both
+      implementations, each in its own dedicated process.
     - The plot is saved to scripts/compare_harvey_sutherland_<timestamp>.png.
 
 Examples:
@@ -35,6 +39,7 @@ Examples:
 import sys
 import time
 import datetime
+import multiprocessing
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -101,75 +106,108 @@ pyrforest_compute = compute_A_f_avg_poly_from_curve
 
 load("harvey-sutherland/hs-matrix.sage")
 
-def hs_compute(C, N):
-    f_poly, _ = C.hyperelliptic_polynomials()
-    f_coeffs = [Integer(c) for c in f_poly]
+def hs_compute(f_coeffs, N):
     return compute_hasse_witt_matrices(f_coeffs, N)
 
+def pyrforest_compute_from_coeffs(p_char, f_coeffs, N):
+    Fp = GF(p_char)
+    Rx = PolynomialRing(Fp, 'x')
+    C = HyperellipticCurve(Rx(f_coeffs))
+    return pyrforest_compute(C, N)
+
 # ---------------------------------------------------------------------------
-# Benchmarking
+# Curve generation (main process only)
 # ---------------------------------------------------------------------------
 
-def generate_good_curves(g):
+def generate_good_curve_data(g):
     """
-    Generate N_PER_GENUS random even-degree curves of genus g that are valid
-    for both implementations at p_check = next_prime(max(g, 5)).
-    Returns a list of HyperellipticCurve objects.
+    Generate N_PER_GENUS validated curves for genus g.  Returns a list of
+    (p_check, f_coeffs) where f_coeffs is a list of plain Python ints
+    (picklable for passing to worker processes).
     """
-    p_check = next_prime(max(g, 5))
-    curves = []
-    while len(curves) < N_PER_GENUS:
+    p_check = int(next_prime(max(g, 5)))
+    data = []
+    while len(data) < N_PER_GENUS:
         C = random_hyperelliptic_even_degree(p_check, g)
-        if p_check in pyrforest_compute(C, p_check) and p_check in hs_compute(C, p_check):
-            curves.append(C)
-    return curves
+        f_poly, _ = C.hyperelliptic_polynomials()
+        f_coeffs = [int(c) for c in f_poly]
+        if (p_check in pyrforest_compute(C, p_check) and
+                p_check in hs_compute(f_coeffs, p_check)):
+            data.append((p_check, f_coeffs))
+    return data
 
+# ---------------------------------------------------------------------------
+# Worker function (runs in a dedicated child process)
+# ---------------------------------------------------------------------------
 
-def time_impl(impl_fn, curves, N):
+def benchmark_worker(args):
     """
-    Time impl_fn(C, N) on each curve.  Returns list of process-time measurements
-    in nanoseconds (only for runs where p_check appears in the result).
+    Time one implementation on the given curves.
+    args: (g, impl_name, curves_data, N)
+    Returns (g, impl_name, mean_ns) as plain Python values.
     """
-    p_check = next_prime(max(curves[0].genus(), 5))
-    times_ns = []
-    for C in curves:
-        t0 = time.process_time_ns()
-        result = impl_fn(C, N)
-        t1 = time.process_time_ns()
+    g, impl_name, curves_data, N = args
+    times = []
+    for p_check, f_coeffs in curves_data:
+        if impl_name == 'pyrforest':
+            t0 = time.process_time_ns()
+            result = pyrforest_compute_from_coeffs(p_check, f_coeffs, N)
+            t1 = time.process_time_ns()
+        else:
+            t0 = time.process_time_ns()
+            result = hs_compute(f_coeffs, N)
+            t1 = time.process_time_ns()
         if p_check in result:
-            times_ns.append(t1 - t0)
-    return times_ns
+            times.append(t1 - t0)
+    return g, impl_name, float(sum(times) / len(times))
 
+# ---------------------------------------------------------------------------
+# Generate all curves in main process, then dispatch workers
+# ---------------------------------------------------------------------------
 
 print(f"Comparing pyrforest vs Harvey-Sutherland implementations")
 print(f"  genus range : g = {G_MIN} .. {G_MAX}")
 print(f"  curves/genus: {N_PER_GENUS}  (same curves used for both)")
 print(f"  N_max       : {N_MAX}")
-print()
-print(f"  {'g':>3}  {'p_check':>7}  {'pyrforest (ms)':>14}  {'harvey-suth (ms)':>16}")
-print(f"  {'-'*3}  {'-'*7}  {'-'*14}  {'-'*16}")
+print(f"Generating curves...", end=' ', flush=True)
+
+all_curve_data = {}
+for g in range(G_MIN, G_MAX + 1):
+    all_curve_data[g] = generate_good_curve_data(g)
+print("done.")
+print(f"Running benchmarks (each implementation in its own process)...")
 sys.stdout.flush()
 
-genera        = []
-pf_mean_times = []   # nanoseconds
-hs_mean_times = []   # nanoseconds
-
+tasks = []
 for g in range(G_MIN, G_MAX + 1):
-    p_check = next_prime(max(g, 5))
-    curves  = generate_good_curves(g)
+    tasks.append((g, 'pyrforest', all_curve_data[g], N_MAX))
+    tasks.append((g, 'hs',        all_curve_data[g], N_MAX))
 
-    pf_times = time_impl(pyrforest_compute, curves, N_MAX)
-    hs_times = time_impl(hs_compute,        curves, N_MAX)
+# Use fork so child processes inherit all loaded Sage functions.
+# maxtasksperchild=1 ensures each task gets a brand-new process.
+ctx = multiprocessing.get_context('fork')
+raw = {}   # g -> {impl_name -> mean_ns}
+with ctx.Pool(maxtasksperchild=int(1)) as pool:
+    for g, impl_name, mean_ns in pool.imap_unordered(benchmark_worker, tasks):
+        if g not in raw:
+            raw[g] = {}
+        raw[g][impl_name] = mean_ns
 
-    pf_mean = sum(pf_times) / len(pf_times)
-    hs_mean = sum(hs_times) / len(hs_times)
+# ---------------------------------------------------------------------------
+# Print results table (sorted by genus)
+# ---------------------------------------------------------------------------
 
-    genera.append(g)
-    pf_mean_times.append(pf_mean)
-    hs_mean_times.append(hs_mean)
+genera        = sorted(raw.keys())
+pf_mean_times = [raw[g]['pyrforest'] for g in genera]
+hs_mean_times = [raw[g]['hs']        for g in genera]
 
-    print(f"  g={g:3d}  p={p_check:4d}  {pf_mean/1e6:14.2f}  {hs_mean/1e6:16.2f}")
-    sys.stdout.flush()
+print()
+print(f"  {'g':>3}  {'pyrforest (ms)':>14}  {'harvey-suth (ms)':>16}")
+print(f"  {'-'*3}  {'-'*14}  {'-'*16}")
+for g in genera:
+    pf = raw[g]['pyrforest']
+    hs = raw[g]['hs']
+    print(f"  g={g:3d}  {pf/1e6:14.2f}  {hs/1e6:16.2f}")
 
 # ---------------------------------------------------------------------------
 # Power-law fit:  T(g) = A · g^α  via linear regression on log-log data
