@@ -46,12 +46,13 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
         lam: Integer = ceil(g/2)
         mu = lam + 1
     dl = (2*ell + 1)*(g + 1) - 1
+    min_prime = max(4*g, ell*d + 1)
 
-    p_to_mat = [{}, {}]
-    p_to_int = [{}, {}]
+    p_to_mat = [{} for _ in range(dl)]
+    p_to_int = [{} for _ in range(dl)]
 
     # make the acc. remainder tree for matrices
-    for i in [0..(mu - 1)]:
+    for i in [0..(dl-1)]:
         value_tree_leaves = [ZPmuMatrix.identity(ZZ, d, mu) for _ in range(d*ell)]
 
         for j in [(d*ell + 1)..N]:
@@ -65,7 +66,7 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
         
 
         for p in range(N+1):
-            if is_prime(p) and p > 4*g:
+            if is_prime(p) and p > min_prime:
                 T_bar = leaf_val_list[p-1]
                 T_bar_int = T_bar.realize(p)
                 T_bar_mod_p_mu = T_bar_int.apply_map(lambda x: Zmod(p^mu)(x))
@@ -73,23 +74,23 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
                 p_to_mat[i][p] = T_mod_p_mu
     
     #make the acc remainder tree for integers
-    for i in [0, 1]:
+    for i in [0..(g - 1)]:
         value_tree_leaves = []
 
-        for k in range(1, N+1):
+        for k in [(d*ell + 1)..N]:
             int_i_j = ZPmu([k, i], mu)
             value_tree_leaves.append(int_i_j)
         
         value_tree = build_product_tree(value_tree_leaves)
-        modulus_tree = build_product_tree([k^2 if is_prime(k) else 1 for k in range(1, N+1)])
+        modulus_tree = build_product_tree([k^mu if is_prime(k) else 1 for k in range(1, N+1)])
 
-        rem_tree, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZPmu([1], mu))
+        _, leaf_val_list = remainder_tree_builder(value_tree, modulus_tree, identity = ZPmu([1], mu))
 
         for p in range(N+1):
-            if is_prime(p) and p != 2:
+            if is_prime(p) and p > min_prime:
                 T_bar = leaf_val_list[p-1]
                 T_bar_int = T_bar.realize(p)
-                p_to_int[i][p] = Zmod(p^2)(T_bar_int)
+                p_to_int[i][p] = Zmod(p^mu)(T_bar_int)
     
     
 
@@ -98,7 +99,7 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
     p_to_A_f = {}
 
     for p in range(N+1):
-        if is_prime(p) and p > 5:
+        if is_prime(p) and p > min_prime:
             # Skip bad primes: p divides F_coeffs[0] means f has a root at x=0 mod p
             if gcd(p, ZZ(F_coeffs[0])) != 1:
                 continue
@@ -106,28 +107,15 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
             if p < g:
                 continue
 
-            R = Zmod(p^2)
+            R = Zmod(p^mu)
             m = (p-1)//2
 
-            F_coeffs_p2 = [R(c) for c in F_coeffs]
-            F0_p2 = R(F_coeffs_p2[0])
+            F_coeffs_p_mu = [R(c) for c in F_coeffs]
+            F0_p_mu = R(F_coeffs_p_mu[0])
 
             acc = Matrix(R, 1, d)
-
-            R_0 = p_to_mat[0][p]
-            R_p = p_to_mat[1][p]
-
-            Rp_minus_R0 = R_p - R_0
-            R_1 = Rp_minus_R0.apply_map(lambda x: R(Integer(x)/p))
-            sprint_matrices = [R_0 + (l*p)*R_1 for l in range(0, g)]
-
-            int_0 = p_to_int[0][p]
-            int_p = p_to_int[1][p]
-
-            int_p_minus_int_0 = int_p - int_0
-            int_1 = R(Integer(int_p_minus_int_0)/p)
-
-            int_products = [int_0 + (l*p)*int_1 for l in range(0, g)]
+            sprint_matrices = [p_to_mat[i][p] for i in range(0, dl)]
+            int_products = [p_to_int[l][p] for l in range(0, g)]
 
             A_f = []
             
@@ -143,18 +131,18 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
                 # the following step is to compute the single step 
                 # U_(ip) = U_(ip-1)*T_(ip)*(constants)
                 if l == 0:
-                    acc[0, -1] = R(F0_p2^m)
+                    acc[0, -1] = R(F0_p_mu^m)
                 else:
                     T_single = generate_T_matrix(p, p*l, d, m, F_coeffs, R)
 
                     Hk = acc * T_single[:,-1]
-                    to_invert = l*p*F0_p2 
+                    to_invert = l*p*F0_p_mu 
                     Hk = Hk.apply_map(lambda x: divide_custom(x, to_invert, p, R))
                     acc_new = [acc[0][i] for i in range(1, len(acc[0]))] + [Hk[0][0]]
                     acc = Matrix(R, 1, d, acc_new)
 
                 acc = acc * sprint_matrices[l]
-                to_invert = int_products[l]*(F0_p2^(p-1))
+                to_invert = int_products[l]*(F0_p_mu^(p-1))
                 acc = acc.apply_map(lambda x: x*to_invert^(-1))
                 # reversed: acc entries are ordered right-to-left in Harvey's
                 # column convention, so the last entry corresponds to column 0
