@@ -3,14 +3,14 @@ from typing import reveal_type
 load(_os.path.abspath("P8-utils.sage"))
 
 # Constructing the matrix on page 39 of notes (Section 7.3)
-def construct_T_bar_ijp(i, j, d, F_coeffs, mu=2):
+def construct_T_bar_ijp(i, j, d, F_coeffs, mu, ell):
     arr = [[ZPmu([0, 0], mu) for _ in range(d)] for _ in range(d)]
 
     for k in range(1, d):
         arr[k][k-1] = ZPmu([2*j*F_coeffs[0], 2*i*F_coeffs[0]], mu)
     
     for k in range(d):
-        arr[k][d-1] = ZPmu([(d-k-2*j)*F_coeffs[d-k], (d-k-2*i)*F_coeffs[d-k]], mu)
+        arr[k][d-1] = ZPmu([(d-k-2*j)*F_coeffs[d-k], ((d-k)*(2*ell + 1) - 2*i)*F_coeffs[d-k]], mu)
 
     return ZPmuMatrix.from_array(ZZ, arr, mu)
 
@@ -45,6 +45,7 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0):
     lam: Integer = ceil(g/2)
     mu = lam + 1
     dl = (2*ell + 1)*(g + 1) - 1
+
     min_prime = max(4*g, ell*d + 1)
 
     p_to_mat = [{} for _ in range(dl)]
@@ -55,7 +56,7 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0):
         value_tree_leaves = [ZPmuMatrix.identity(ZZ, d, mu) for _ in range(d*ell)]
 
         for j in [(d*ell + 1)..N]:
-            T_bar_ijp = construct_T_bar_ijp(i, j - d*ell, d, F_coeffs, mu)
+            T_bar_ijp = construct_T_bar_ijp(i, j - d*ell, d, F_coeffs, mu, ell)
             value_tree_leaves.append(T_bar_ijp)
 
         value_tree = build_product_tree(value_tree_leaves)
@@ -97,7 +98,7 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0):
         i_th_row_small_step_matrices = []
         for s in [1..ell]:
             leaves = [
-                construct_T_bar_ijp(i + 1, -s*d + j, d, F_coeffs, mu)
+                construct_T_bar_ijp(i + 1, -s*d + j, d, F_coeffs, mu, ell)
                 for j in range(d)
             ]
             i_th_row_small_step_matrices.append(prod(leaves))
@@ -178,7 +179,7 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0):
                 # reversed: acc entries are ordered right-to-left in Harvey's
                 # column convention, so the last entry corresponds to column 0
                 A_f.append(list(reversed(current_row)))
-            A_f_p = Matrix(A_f).apply_map(lambda x: Integer(x) % (p))
+            A_f_p = Matrix(A_f).apply_map(lambda x: Integer(x) % (p^(lam)))
             p_to_A_f[p] = A_f_p
     
     return p_to_A_f
@@ -200,7 +201,7 @@ Sqrt up to 50,000 took 1943 seconds (30 minutes)
 import os as _os
 if 'P8-avg-poly' in _os.path.basename(sys.argv[0]):
     start = timer()
-    N = 200
+    N = 199
     R = PolynomialRing(Integers(), 'x')
     x = R.gen()
     #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
