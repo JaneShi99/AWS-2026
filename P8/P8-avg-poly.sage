@@ -40,11 +40,10 @@ def divide_custom(x, y, p, R):
     return ans
 
 
-def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
+def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0):
     g = (d - 1)//2
-    if mu != 2:
-        lam: Integer = ceil(g/2)
-        mu = lam + 1
+    lam: Integer = ceil(g/2)
+    mu = lam + 1
     dl = (2*ell + 1)*(g + 1) - 1
     min_prime = max(4*g, ell*d + 1)
 
@@ -74,8 +73,8 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
                 p_to_mat[i][p] = T_mod_p_mu
     
     #make the acc remainder tree for integers
-    for i in [0..(g - 1)]:
-        value_tree_leaves = []
+    for i in [0..(dl - 1)]:
+        value_tree_leaves = [ZPmu([1], mu) for _ in range(d*ell)]
 
         for k in [(d*ell + 1)..N]:
             int_i_j = ZPmu([k, i], mu)
@@ -91,8 +90,30 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
                 T_bar = leaf_val_list[p-1]
                 T_bar_int = T_bar.realize(p)
                 p_to_int[i][p] = Zmod(p^mu)(T_bar_int)
-    
-    
+
+    # compute the small-step matrices
+    small_step_matrix = []
+    for i in [0..(dl - 1)]: 
+        i_th_row_small_step_matrices = []
+        for s in [1..ell]:
+            leaves = [
+                construct_T_bar_ijp(i + 1, -s*d + j, d, F_coeffs, mu)
+                for j in range(d)
+            ]
+            i_th_row_small_step_matrices.append(prod(leaves))
+        small_step_matrix.append(i_th_row_small_step_matrices)
+
+    small_step_denominators = []
+    for i in [0..(dl - 1)]: 
+        i_th_row_small_step_denominators = []
+        for s in [1..ell]:
+            leaves = [
+                ZPmu([-s*d + j, i + 1], mu)
+                for j in range(d)
+            ]
+            i_th_row_small_step_denominators.append(prod(leaves))
+        small_step_denominators.append(i_th_row_small_step_denominators)
+        
 
     #now, we're ready to compute A_f fully. We have a loop that computes A_f for each p at a time
 
@@ -115,7 +136,7 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
 
             acc = Matrix(R, 1, d)
             sprint_matrices = [p_to_mat[i][p] for i in range(0, dl)]
-            int_products = [p_to_int[l][p] for l in range(0, g)]
+            int_products = [p_to_int[l][p] for l in range(0, dl)]
 
             A_f = []
             
@@ -127,13 +148,13 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
             print(int_products)
             '''
 
-            for l in range(0, g):
+            for l in range(0, dl):
                 # the following step is to compute the single step 
                 # U_(ip) = U_(ip-1)*T_(ip)*(constants)
                 if l == 0:
-                    acc[0, -1] = R(F0_p_mu^m)
+                    acc[0, -1] = R(F0_p_mu^((2*ell + 1)*m))
                 else:
-                    T_single = generate_T_matrix(p, p*l, d, m, F_coeffs, R)
+                    T_single = generate_T_matrix(p, p*l, d, (2*ell + 1)*m, F_coeffs, R)
 
                     Hk = acc * T_single[:,-1]
                     to_invert = l*p*F0_p_mu 
@@ -141,13 +162,22 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0, mu=2):
                     acc_new = [acc[0][i] for i in range(1, len(acc[0]))] + [Hk[0][0]]
                     acc = Matrix(R, 1, d, acc_new)
 
+                current_row = []
                 acc = acc * sprint_matrices[l]
-                to_invert = int_products[l]*(F0_p_mu^(p-1))
+                to_invert = int_products[l]*(F0_p_mu^(p - d*l -1))
                 acc = acc.apply_map(lambda x: x*to_invert^(-1))
+                coefs = acc[0][d-g:]
+                current_row += coefs
+
+                for s in range(ell - 1, -1, -1): 
+                    acc = acc * small_step_matrix[l][s].realize(p)
+                    to_invert = small_step_denominators[l][s].realize(p)*(F0_p_mu^(d))
+                    acc = acc.apply_map(lambda x: x*to_invert^(-1))
+                    current_row += acc.list()
+                
                 # reversed: acc entries are ordered right-to-left in Harvey's
                 # column convention, so the last entry corresponds to column 0
-                A_f.append(list(reversed(acc[0][(-g):])))
-
+                A_f.append(list(reversed(current_row)))
             A_f_p = Matrix(A_f).apply_map(lambda x: Integer(x) % (p))
             p_to_A_f[p] = A_f_p
     
@@ -158,7 +188,7 @@ def compute_A_f_avg_poly_from_curve(C, N, mu=2):
     F_coeffs_poly, _ = C.hyperelliptic_polynomials()
     d = C.degree()
     F_coeffs = [Integer(c) for c in F_coeffs_poly]
-    return compute_A_F_l_avg_poly(F_coeffs, d, N, 0, mu)
+    return compute_A_F_l_avg_poly(F_coeffs, d, N, 1)
 
 
 '''
@@ -170,7 +200,7 @@ Sqrt up to 50,000 took 1943 seconds (30 minutes)
 import os as _os
 if 'P8-avg-poly' in _os.path.basename(sys.argv[0]):
     start = timer()
-    N = 1000
+    N = 200
     R = PolynomialRing(Integers(), 'x')
     x = R.gen()
     #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
