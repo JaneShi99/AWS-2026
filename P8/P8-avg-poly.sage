@@ -10,7 +10,7 @@ def construct_T_bar_ijp(i, j, d, F_coeffs, mu, ell):
         arr[k][k-1] = ZPmu([2*j*F_coeffs[0], 2*i*F_coeffs[0]], mu)
     
     for k in range(d):
-        arr[k][d-1] = ZPmu([(d-k-2*j)*F_coeffs[d-k], ((d-k)*(2*ell + 1) - 2*i)*F_coeffs[d-k]], mu)
+        arr[k][d-1] = ZPmu([(-(d - k)*(2*ell + 1) + 2*(d - k) - 2*j)*F_coeffs[d-k], ((d - k)*(2*ell + 1) - 2*i)*F_coeffs[d-k]], mu)
 
     return ZPmuMatrix.from_array(ZZ, arr, mu)
 
@@ -78,7 +78,7 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0):
         value_tree_leaves = [ZPmu([1], mu) for _ in range(d*ell)]
 
         for k in [(d*ell + 1)..N]:
-            int_i_j = ZPmu([k, i], mu)
+            int_i_j = ZPmu([k - d*ell, i], mu)
             value_tree_leaves.append(int_i_j)
         
         value_tree = build_product_tree(value_tree_leaves)
@@ -137,7 +137,7 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0):
 
             acc = Matrix(R, 1, d)
             sprint_matrices = [p_to_mat[i][p] for i in range(0, dl)]
-            int_products = [p_to_int[l][p] for l in range(0, dl)]
+            int_products = [p_to_int[i][p] for i in range(0, dl)]
 
             A_f = []
             
@@ -154,6 +154,7 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0):
                 # U_(ip) = U_(ip-1)*T_(ip)*(constants)
                 if l == 0:
                     acc[0, -1] = R(F0_p_mu^((2*ell + 1)*m))
+                    if p == 199: print(acc)
                 else:
                     T_single = generate_T_matrix(p, p*l, d, (2*ell + 1)*m, F_coeffs, R)
 
@@ -165,13 +166,14 @@ def compute_A_F_l_avg_poly(F_coeffs, d, N, ell=0):
 
                 current_row = []
                 acc = acc * sprint_matrices[l]
-                to_invert = int_products[l]*(F0_p_mu^(p - d*l -1))
+                to_invert = int_products[l]*(F0_p_mu^(p - d*ell - 1))
                 acc = acc.apply_map(lambda x: x*to_invert^(-1))
+                if p == 199 and l == 0: print(acc.apply_map(lambda x: Integer(x) % (p^(lam))))
                 coefs = acc[0][d-g:]
                 current_row += coefs
 
                 for s in range(ell - 1, -1, -1): 
-                    acc = acc * small_step_matrix[l][s].realize(p)
+                    acc = acc * (small_step_matrix[l][s].realize(p).apply_map(lambda x: Zmod(p^mu)(x * inverse_mod(2^(d), p^mu))))
                     to_invert = small_step_denominators[l][s].realize(p)*(F0_p_mu^(d))
                     acc = acc.apply_map(lambda x: x*to_invert^(-1))
                     current_row += acc.list()
@@ -189,7 +191,7 @@ def compute_A_f_avg_poly_from_curve(C, N, mu=2):
     F_coeffs_poly, _ = C.hyperelliptic_polynomials()
     d = C.degree()
     F_coeffs = [Integer(c) for c in F_coeffs_poly]
-    return compute_A_F_l_avg_poly(F_coeffs, d, N, 1)
+    return compute_A_F_l_avg_poly(F_coeffs, d, N, 2)
 
 
 '''
@@ -201,7 +203,7 @@ Sqrt up to 50,000 took 1943 seconds (30 minutes)
 import os as _os
 if 'P8-avg-poly' in _os.path.basename(sys.argv[0]):
     start = timer()
-    N = 199
+    N = 200
     R = PolynomialRing(Integers(), 'x')
     x = R.gen()
     #f = -(x^8 - x^6 + 6*x^5 - 7*x^4 + 5*x^3 + x^2 - x + 1)
